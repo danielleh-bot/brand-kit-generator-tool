@@ -4,9 +4,16 @@ A wizard-style brand kit generator for publishers. Drop in a URL, get back a
 portable `brand-kit.css` and a fully-styled HTML article prototype with the new
 feed experience.
 
-## Run it
+## Try it live
 
-Two ways:
+Live, hosted from this branch via jsDelivr (no setup, just open the link):
+
+- **jsDelivr (latest from branch):**
+  https://cdn.jsdelivr.net/gh/danielleh-bot/brand-kit-generator-tool@claude%2Fbrand-kit-html-prototype-EbtYN/studio.html
+- **raw.githack (latest from branch):**
+  https://raw.githack.com/danielleh-bot/brand-kit-generator-tool/claude/brand-kit-html-prototype-EbtYN/studio.html
+
+## Run it locally
 
 ### 1. Single-file (no server needed)
 
