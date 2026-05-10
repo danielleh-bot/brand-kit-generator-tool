@@ -1,0 +1,675 @@
+diff --git a/generate.js b/generate.js
+index ffe826d..56a9726 100644
+--- a/generate.js
++++ b/generate.js
+@@ -9,7 +9,7 @@ const fs = require('fs');
+ const path = require('path');
+ const puppeteer = require('puppeteer-core');
+ 
+-const { extractBrandKit, extractContent, extractNavigation } = require('./lib/crawler');
++const { extractBrandKit, extractContent, extractNavigation, extractRelatedArticles } = require('./lib/crawler');
+ const { buildGoogleFontsUrl, resolveAllFonts } = require('./lib/fonts');
+ const { computeAnalysis } = require('./lib/analysis');
+ const { generateFeedContent } = require('./lib/feed-content');
+@@ -27,6 +27,7 @@ program
+   .option('--prototype-only', 'Only generate feed prototype (skip report)')
+   .option('--brand-kit <path>', 'Use existing brand-kit.json instead of crawling')
+   .option('--chrome <path>', 'Path to Chrome/Chromium executable')
++  .option('--accept-low-quality', 'Allow generating output from a brand kit where most tokens are fallbacks (default: refuse)')
+   .option('--list', 'List previously generated publishers')
+   .parse();
+ 
+@@ -104,11 +105,23 @@ async function main() {
+   let brandKit;
+   let content = {};
+   let navigation = {};
++  let relatedArticles = [];
+ 
+   // Use existing brand kit or crawl
+   if (opts.brandKit) {
+     console.log('📄 Loading existing brand kit...');
+     brandKit = JSON.parse(fs.readFileSync(path.resolve(opts.brandKit), 'utf-8'));
++    // Refuse to silently produce a "successful" report from a brand kit that
++    // was never actually crawled (i.e. the file is the canned defaults). The
++    // user must opt into using a low-quality kit explicitly.
++    const eq = brandKit && brandKit.metadata && brandKit.metadata.extraction_quality;
++    if (!eq) {
++      console.warn('⚠️  Loaded brand kit has no extraction_quality metadata. It may have been hand-edited or pre-generated. Re-run without --brand-kit if this is unexpected.');
++    } else if (eq.total_tokens > 0 && eq.extraction_ratio < 0.5 && !opts.acceptLowQuality) {
++      console.error('❌ Loaded brand kit was mostly fallbacks (extraction_ratio = ' + eq.extraction_ratio + '). Refusing to generate a polished report from synthetic data.');
++      console.error('   Re-crawl the URL, or pass --accept-low-quality if you really want to proceed.');
++      process.exit(1);
++    }
+     console.log('   ✓ Brand kit loaded\n');
+   } else {
+     // Find Chrome
+@@ -154,12 +167,26 @@ async function main() {
+ 
+       console.log('   Extracting navigation...');
+       navigation = await extractNavigation(page);
+-      console.log('   ✓ Navigation extracted\n');
++      console.log('   ✓ Navigation extracted');
++
++      console.log('   Extracting related articles for feed...');
++      relatedArticles = await extractRelatedArticles(page, url);
++      console.log(`   ✓ ${relatedArticles.length} related articles extracted\n`);
+     } finally {
+       await browser.close();
+     }
+   }
+ 
++  // Loud warning when extraction quality is poor — surfaces silent failures the
++  // tool used to mask by filling defaults.
++  const eq = brandKit && brandKit.metadata && brandKit.metadata.extraction_quality;
++  if (eq && eq.total_tokens > 0 && eq.extraction_ratio < 0.5) {
++    console.warn(`\n⚠️  Extraction quality is low: only ${eq.extracted_token_count}/${eq.total_tokens} brand tokens were actually pulled from the page. The rest are fallbacks. Common causes: site blocks headless Chrome, content is rendered client-side after networkidle2, or selectors did not match the publisher's markup. Inspect brand-kit.json → metadata.extraction_quality.fallback_tokens for the list.\n`);
++  }
++  if (!opts.brandKit && (!relatedArticles || relatedArticles.length < 3)) {
++    console.warn(`⚠️  Only found ${relatedArticles ? relatedArticles.length : 0} related articles — feed will be padded with synthetic placeholders. The article URL probably doesn't expose a "related"/"popular" section. Try crawling the homepage instead to capture real card content.\n`);
++  }
++
+   // Ensure output directory exists
+   fs.mkdirSync(outputDir, { recursive: true });
+ 
+@@ -172,8 +199,10 @@ async function main() {
+   const resolvedFonts = resolveAllFonts(brandKit);
+   const googleFontsUrl = buildGoogleFontsUrl(brandKit);
+ 
+-  // Generate feed content
+-  const feedContent = generateFeedContent(brandKit, navigation);
++  // Generate feed content. Native cards prefer real, extracted articles; we
++  // only fall back to synthetic templates when the page didn't expose enough
++  // related content.
++  const feedContent = generateFeedContent(brandKit, navigation, { content, relatedArticles });
+ 
+   // Compute analysis
+   const analysis = computeAnalysis(brandKit, defaults);
+diff --git a/js/crawl.js b/js/crawl.js
+index fc9324e..cdee22c 100644
+--- a/js/crawl.js
++++ b/js/crawl.js
+@@ -8,15 +8,43 @@ const CORS_PROXIES = [
+ ];
+ 
+ async function fetchWithProxy(url) {
++    const errors = [];
+     for (const proxy of CORS_PROXIES) {
++        const proxyUrl = proxy(url);
+         try {
+-            const resp = await fetch(proxy(url), { signal: AbortSignal.timeout(15000) });
+-            if (resp.ok) return await resp.text();
+-        } catch(e) { /* try next */ }
++            const resp = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
++            if (resp.ok) {
++                const text = await resp.text();
++                // Some proxies return a JSON error envelope as 200 OK. If the
++                // response is suspiciously short or doesn't look like HTML,
++                // treat it as a failure so we don't crawl error pages.
++                if (text.length < 1000 || !/<html|<!DOCTYPE/i.test(text)) {
++                    errors.push(`${new URL(proxyUrl).hostname}: returned ${text.length} chars, not HTML`);
++                    continue;
++                }
++                return text;
++            }
++            errors.push(`${new URL(proxyUrl).hostname}: HTTP ${resp.status}`);
++        } catch (e) {
++            errors.push(`${new URL(proxyUrl).hostname}: ${e.name === 'TimeoutError' ? 'timeout' : e.message}`);
++        }
++    }
++    if (typeof addLog === 'function') {
++        addLog('All CORS proxies failed: ' + errors.join('; '), 'error');
+     }
+     return null;
+ }
+ 
++// Heuristic: did a manual HTML paste actually contain a real publisher page?
++// We need at least one h1, one body paragraph, and a <head> with title.
++function looksLikePublisherHtml(html) {
++    if (!html || html.length < 2000) return { ok: false, reason: 'HTML too short (' + (html ? html.length : 0) + ' chars). Did you paste only a fragment?' };
++    if (!/<html/i.test(html)) return { ok: false, reason: 'Missing <html> tag — paste the full page source, not just the body.' };
++    if (!/<head[\s>]/i.test(html)) return { ok: false, reason: 'Missing <head> — full page source is required for brand extraction.' };
++    if (!/<h1/i.test(html) && !/<title/i.test(html)) return { ok: false, reason: 'Missing both <h1> and <title> — the page may be a login wall or 404.' };
++    return { ok: true };
++}
++
+ function addLog(msg, type = '') {
+     const log = document.getElementById('crawlLog');
+     const ts = new Date().toLocaleTimeString();
+@@ -277,6 +305,15 @@ async function startCrawl() {
+                 document.getElementById('crawlBtn').disabled = false;
+                 return;
+             }
++            const sanity = looksLikePublisherHtml(manualHtml);
++            if (!sanity.ok) {
++                addLog('Pasted HTML did not pass sanity checks: ' + sanity.reason, 'error');
++                addLog('Aborting — refusing to generate a brand kit from invalid input.', 'error');
++                statusBar.className = 'status-bar error';
++                statusText.textContent = 'Invalid HTML input — aborted';
++                document.getElementById('crawlBtn').disabled = false;
++                return;
++            }
+             addLog('Received manual HTML input (' + manualHtml.length + ' chars)', 'success');
+             await analyzePage(manualHtml, artHtml, pubUrl, artUrl, pubName);
+         } else {
+diff --git a/lib/analysis.js b/lib/analysis.js
+index 8bae3cf..486ad1d 100644
+--- a/lib/analysis.js
++++ b/lib/analysis.js
+@@ -51,7 +51,10 @@ function extractBrandKitValue(brandKit, property) {
+       return null;
+     },
+     'spacing.letterSpacing':      () => getNestedValue(brandKit, 'fonts.type_scale.section_headings.letterSpacing'),
+-    'textStyles.hoverDecoration': () => 'underline',
++    // hover decoration: try to read from extracted link styles before falling back to a sensible default.
++    'textStyles.hoverDecoration': () => getNestedValue(brandKit, 'fonts.type_scale.navigation.text_decoration')
++                                        || getNestedValue(brandKit, 'colors.primary.usage')?.includes('Links') ? 'underline'
++                                        : 'underline',
+     'categoryLabel':              () => {
+       const labels = getNestedValue(brandKit, 'brand_voice.content_labels');
+       if (labels && Object.keys(labels).length > 0) return Object.keys(labels).join(', ');
+@@ -100,10 +103,30 @@ function computeAnalysis(brandKit, defaults) {
+   let missingCount = 0;
+   let exactCount = 0;
+ 
++  // Trace whether the source token came from the page or from a fallback. This
++  // is the fix for the "fake analysis" bug: a row that "drifts from default"
++  // because both sides are defaults is not a real finding.
++  function tokenProvenance(sourcePath) {
++    const node = getNestedValue(brandKit, sourcePath);
++    if (!node) return 'missing';
++    if (typeof node === 'object' && typeof node.source === 'string') return node.source;
++    // For path-y sources (fonts.type_scale) walk the immediate children.
++    if (typeof node === 'object') {
++      const childSources = Object.values(node).filter(v => v && typeof v === 'object' && typeof v.source === 'string').map(v => v.source);
++      if (childSources.length > 0) {
++        return childSources.includes('extracted') ? 'extracted' : 'fallback';
++      }
++    }
++    return 'unknown';
++  }
++
++  let fabricatedDriftCount = 0;
++
+   for (const def of PROPERTY_DEFS) {
+     const before = displayValue(getNestedValue(defaults, def.key));
+     const afterRaw = extractBrandKitValue(brandKit, def.key);
+     const after = displayValue(afterRaw);
++    const provenance = tokenProvenance(def.source);
+ 
+     let status;
+     if (before === '—' && after !== '—') {
+@@ -115,6 +138,10 @@ function computeAnalysis(brandKit, defaults) {
+     } else if (after === '—') {
+       status = 'exact'; // both null-ish
+       exactCount++;
++    } else if (provenance === 'fallback') {
++      // Drift between default and a fallback is a fake comparison — call it out.
++      status = 'fabricated';
++      fabricatedDriftCount++;
+     } else {
+       status = 'drift';
+       driftCount++;
+@@ -126,6 +153,7 @@ function computeAnalysis(brandKit, defaults) {
+       before,
+       after,
+       source: def.source,
++      provenance,
+       status,
+     });
+   }
+@@ -138,9 +166,12 @@ function computeAnalysis(brandKit, defaults) {
+     driftCount,
+     missingCount,
+     exactCount,
++    fabricatedDriftCount,
+     matchedByKit,
+     coveragePercent: Math.round((matchedByKit / totalProperties) * 100),
+     driftPercent: Math.round((driftCount / totalProperties) * 100),
++    fabricatedPercent: Math.round((fabricatedDriftCount / totalProperties) * 100),
++    extractionQuality: brandKit.metadata && brandKit.metadata.extraction_quality,
+   };
+ 
+   // Generate gap descriptions
+diff --git a/lib/crawler.js b/lib/crawler.js
+index d05f2dd..98485de 100644
+--- a/lib/crawler.js
++++ b/lib/crawler.js
+@@ -121,21 +121,26 @@ async function extractBrandKit(page, url) {
+       }
+     }
+ 
+-    // Scan key elements for colors
++    // Scan key elements for colors. Selectors are intentionally broad: modern publishers
++    // ship hashed CSS-module class names, so we lean on tag + role + ARIA + common
++    // class-name fragments to find brand surfaces.
+     const colorSources = [
+-      { sel: 'a', prop: 'color', usage: 'Links' },
+-      { sel: 'button, [role="button"], .btn', prop: 'background-color', usage: 'Buttons' },
+-      { sel: 'button, [role="button"], .btn', prop: 'color', usage: 'Button text' },
+-      { sel: 'nav a, [role="navigation"] a', prop: 'color', usage: 'Navigation' },
+-      { sel: 'h1, h2, h3', prop: 'color', usage: 'Headlines' },
+-      { sel: 'p', prop: 'color', usage: 'Body text' },
+-      { sel: 'time, .date, .timestamp, [class*="meta"]', prop: 'color', usage: 'Timestamps' },
+-      { sel: 'header, [role="banner"]', prop: 'background-color', usage: 'Header background' },
+-      { sel: 'footer, [role="contentinfo"]', prop: 'background-color', usage: 'Footer background' },
++      { sel: 'a, [role="link"]', prop: 'color', usage: 'Links' },
++      { sel: 'button, [role="button"], .btn, [class*="button"], [class*="Button"], [class*="cta"], [class*="CTA"], [type="submit"], a[class*="btn"]', prop: 'background-color', usage: 'Buttons' },
++      { sel: 'button, [role="button"], .btn, [class*="button"], [class*="Button"], [class*="cta"], [class*="CTA"], [type="submit"], a[class*="btn"]', prop: 'color', usage: 'Button text' },
++      { sel: 'nav a, [role="navigation"] a, header a, [class*="nav"] a, [class*="Nav"] a, [class*="menu"] a', prop: 'color', usage: 'Navigation' },
++      { sel: 'h1, h2, h3, [class*="headline"], [class*="Headline"], [class*="title"], [class*="Title"]', prop: 'color', usage: 'Headlines' },
++      { sel: 'p, [class*="body"], [class*="Body"], article > div, [class*="paragraph"]', prop: 'color', usage: 'Body text' },
++      { sel: 'time, .date, .timestamp, [class*="meta"], [class*="Meta"], [class*="byline"], [datetime]', prop: 'color', usage: 'Timestamps' },
++      { sel: 'header, [role="banner"], [class*="masthead"], [class*="header"]', prop: 'background-color', usage: 'Header background' },
++      { sel: 'footer, [role="contentinfo"], [class*="footer"], [class*="Footer"]', prop: 'background-color', usage: 'Footer background' },
+       { sel: 'body', prop: 'background-color', usage: 'Page background' },
+-      { sel: 'section, [class*="section"], [class*="container"]', prop: 'background-color', usage: 'Section background' },
+-      { sel: 'hr, [class*="separator"], [class*="divider"]', prop: 'border-color', usage: 'Separators' },
+-      { sel: 'hr, [class*="separator"], [class*="divider"]', prop: 'background-color', usage: 'Separators' },
++      { sel: 'main, [role="main"], [class*="main"], [class*="content"], section, [class*="section"], [class*="container"]', prop: 'background-color', usage: 'Section background' },
++      { sel: 'hr, [class*="separator"], [class*="divider"], [role="separator"]', prop: 'border-color', usage: 'Separators' },
++      { sel: 'hr, [class*="separator"], [class*="divider"], [role="separator"]', prop: 'background-color', usage: 'Separators' },
++      { sel: '[class*="tag"], [class*="Tag"], [class*="pill"], [class*="badge"], [class*="Badge"], [class*="label"]', prop: 'background-color', usage: 'Tags & badges' },
++      { sel: '[class*="tag"], [class*="Tag"], [class*="pill"], [class*="badge"], [class*="Badge"], [class*="label"]', prop: 'color', usage: 'Tags & badges' },
++      { sel: 'h1 + p, [class*="deck"], [class*="Deck"], [class*="lead"], [class*="Lead"], [class*="standfirst"], [class*="subtitle"]', prop: 'color', usage: 'Article deck' },
+     ];
+ 
+     for (const { sel, prop, usage } of colorSources) {
+@@ -155,7 +160,11 @@ async function extractBrandKit(page, url) {
+ 
+     function buildColorEntry(entry, name) {
+       if (!entry) return null;
+-      return { name, hex: entry.color.hex, rgb: entry.color.rgb, usage: entry.usages };
++      return { name, hex: entry.color.hex, rgb: entry.color.rgb, usage: entry.usages, source: 'extracted' };
++    }
++    // Mark a hardcoded fallback so downstream consumers can warn instead of pretending it was extracted.
++    function fallbackColor(name, hex, rgb, usage) {
++      return { name, hex, rgb, usage, source: 'fallback' };
+     }
+ 
+     // Detect accent-specific colors
+@@ -165,15 +174,15 @@ async function extractBrandKit(page, url) {
+     const blueColors = accentColors.filter(c => c.color.b > 150 && c.color.r < 100 && c.color.g < 180);
+ 
+     const colors = {
+-      primary: buildColorEntry(accentColors[0], 'Primary Accent') || { name: 'Default Blue', hex: '#2196F3', rgb: 'rgb(33, 150, 243)', usage: [] },
++      primary: buildColorEntry(accentColors[0], 'Primary Accent') || fallbackColor('Default Blue', '#2196F3', 'rgb(33, 150, 243)', []),
+       text: {
+-        primary: buildColorEntry(textColors[0], 'Primary Text') || { name: 'Near Black', hex: '#1A1A2E', rgb: 'rgb(26, 26, 46)', usage: ['Headlines'] },
+-        secondary: buildColorEntry(textColors[Math.floor(textColors.length * 0.4)] || textColors[1], 'Secondary Text') || { name: 'Dark Gray', hex: '#4A4A5A', rgb: 'rgb(74, 74, 90)', usage: ['Body text'] },
+-        tertiary: buildColorEntry(textColors[Math.floor(textColors.length * 0.7)] || textColors[2], 'Tertiary Text') || { name: 'Medium Gray', hex: '#8A8A9A', rgb: 'rgb(138, 138, 154)', usage: ['Timestamps'] },
++        primary: buildColorEntry(textColors[0], 'Primary Text') || fallbackColor('Near Black', '#1A1A2E', 'rgb(26, 26, 46)', ['Headlines']),
++        secondary: buildColorEntry(textColors[Math.floor(textColors.length * 0.4)] || textColors[1], 'Secondary Text') || fallbackColor('Dark Gray', '#4A4A5A', 'rgb(74, 74, 90)', ['Body text']),
++        tertiary: buildColorEntry(textColors[Math.floor(textColors.length * 0.7)] || textColors[2], 'Tertiary Text') || fallbackColor('Medium Gray', '#8A8A9A', 'rgb(138, 138, 154)', ['Timestamps']),
+       },
+       backgrounds: {
+-        base: buildColorEntry(bgColors.find(c => luminance(c.color) > 245), 'White') || { name: 'White', hex: '#FFFFFF', rgb: 'rgb(255, 255, 255)', usage: ['Page background'] },
+-        section: buildColorEntry(bgColors.find(c => luminance(c.color) > 230 && luminance(c.color) < 250), 'Section') || { name: 'Off-White', hex: '#F7F9FC', rgb: 'rgb(247, 249, 252)', usage: ['Section backgrounds'] },
++        base: buildColorEntry(bgColors.find(c => luminance(c.color) > 245), 'White') || fallbackColor('White', '#FFFFFF', 'rgb(255, 255, 255)', ['Page background']),
++        section: buildColorEntry(bgColors.find(c => luminance(c.color) > 230 && luminance(c.color) < 250), 'Section') || fallbackColor('Off-White', '#F7F9FC', 'rgb(247, 249, 252)', ['Section backgrounds']),
+         secondary: buildColorEntry(bgColors.find(c => luminance(c.color) > 210 && luminance(c.color) < 240), 'Secondary') || null,
+         dark: buildColorEntry(darkBgColors[0], 'Dark Background') || null,
+       },
+@@ -216,39 +225,50 @@ async function extractBrandKit(page, url) {
+     const sortedFonts = Object.entries(fontCounts).sort((a, b) => b[1] - a[1]);
+     const genericFonts = ['Arial', 'Helvetica', 'sans-serif', 'serif', 'monospace', 'system-ui', 'Times New Roman', 'Georgia', 'Verdana', 'Tahoma', 'Trebuchet MS'];
+     const customFonts = sortedFonts.filter(([f]) => !genericFonts.includes(f));
+-    const fallbackFonts = sortedFonts.filter(([f]) => genericFonts.includes(f)).map(([f]) => f).slice(0, 3);
++    const genericInUse = sortedFonts.filter(([f]) => genericFonts.includes(f));
++    const fallbackFonts = genericInUse.map(([f]) => f).slice(0, 3);
+ 
+     const fonts = { primary: null, secondary: null, tertiary: [], type_scale: {} };
+ 
+-    if (customFonts.length > 0) {
++    // Pick primary font from the most-used custom font. If the publisher truly uses only
++    // generic fonts (Arial/Helvetica/etc.), report THAT honestly — don't manufacture a
++    // custom font from nothing.
++    const primaryEntry = customFonts[0] || genericInUse[0];
++    if (primaryEntry) {
+       fonts.primary = {
+-        family: customFonts[0][0],
++        family: primaryEntry[0],
+         fallbacks: fallbackFonts.length > 0 ? fallbackFonts : ['sans-serif'],
+         weights: {},
+-        usage: (fontElementMap[customFonts[0][0]] || []).join(', ')
++        usage: (fontElementMap[primaryEntry[0]] || []).join(', '),
++        source: 'extracted',
++        is_generic: genericFonts.includes(primaryEntry[0])
+       };
+-      // Detect weights
+       const h1 = document.querySelector('h1');
+       const p = document.querySelector('p');
+       if (h1) fonts.primary.weights.bold = parseInt(getCS(h1, 'font-weight')) || 700;
+       if (p) fonts.primary.weights.regular = parseInt(getCS(p, 'font-weight')) || 400;
++    } else {
++      fonts.primary = { family: 'sans-serif', fallbacks: ['sans-serif'], weights: { regular: 400, bold: 700 }, usage: '', source: 'fallback', is_generic: true };
+     }
+ 
+-    if (customFonts.length > 1) {
+-      const secFamily = customFonts[1][0];
++    const secondaryEntry = customFonts[1] || (customFonts[0] ? genericInUse[0] : genericInUse[1]);
++    if (secondaryEntry && secondaryEntry[0] !== fonts.primary.family) {
++      const secFamily = secondaryEntry[0];
+       const secIsSerif = /serif|Georgia|Times|Merriweather|Playfair|Lora|Roboto\s*Serif/i.test(secFamily);
+       fonts.secondary = {
+         family: secFamily,
+         weight: 600,
+         style: secIsSerif ? 'italic' : 'normal',
+-        usage: (fontElementMap[secFamily] || []).join(', ')
++        usage: (fontElementMap[secFamily] || []).join(', '),
++        source: 'extracted'
+       };
+     }
+ 
+     if (customFonts.length > 2) {
+       fonts.tertiary = customFonts.slice(2, 5).map(([f]) => ({
+         family: f,
+-        usage: (fontElementMap[f] || []).join(', ')
++        usage: (fontElementMap[f] || []).join(', '),
++        source: 'extracted'
+       }));
+     }
+ 
+@@ -279,13 +299,21 @@ async function extractBrandKit(page, url) {
+           letter_spacing: cs.letterSpacing !== 'normal' && cs.letterSpacing !== '0px' ? cs.letterSpacing : undefined,
+           color: parseColor(cs.color)?.hex,
+           style: cs.fontStyle !== 'normal' ? cs.fontStyle : undefined,
++          source: 'extracted',
++          matched_selector: sel,
+         };
+-        // Remove undefined values
+         Object.keys(fonts.type_scale[role]).forEach(k => {
+           if (fonts.type_scale[role][k] === undefined) delete fonts.type_scale[role][k];
+         });
+       } else {
+-        fonts.type_scale[role] = { ...fallback, family: fonts.primary?.family || 'sans-serif' };
++        // Selector did not match anything on the page. Record the fallback but mark
++        // it so the analysis report can warn that this token was not extracted.
++        fonts.type_scale[role] = {
++          ...fallback,
++          family: fonts.primary?.family || 'sans-serif',
++          source: 'fallback',
++          attempted_selector: sel,
++        };
+       }
+     }
+ 
+@@ -505,14 +533,49 @@ async function extractBrandKit(page, url) {
+       }
+     }
+ 
+-    return { brand, logos, colors, fonts, brand_voice, photo_style, graphics, icons, layout_patterns, spacing };
++    // Extraction-quality summary: walk every token tagged with `source` and count
++    // how many came from the page vs. a fallback. The CLI uses this to refuse to
++    // produce a "successful" report when too much of the brand kit was fabricated.
++    const extractionQuality = (() => {
++      const tally = { extracted: 0, fallback: 0, fallbackTokens: [] };
++      const visit = (path, value) => {
++        if (!value || typeof value !== 'object') return;
++        if (Array.isArray(value)) { value.forEach((v, i) => visit(`${path}[${i}]`, v)); return; }
++        if (typeof value.source === 'string') {
++          if (value.source === 'fallback') {
++            tally.fallback++;
++            tally.fallbackTokens.push(path);
++          } else if (value.source === 'extracted') {
++            tally.extracted++;
++          }
++        }
++        for (const k of Object.keys(value)) {
++          if (k === 'usage' || k === 'matched_selector' || k === 'attempted_selector') continue;
++          visit(path ? `${path}.${k}` : k, value[k]);
++        }
++      };
++      visit('colors', colors);
++      visit('fonts', fonts);
++      const total = tally.extracted + tally.fallback;
++      const ratio = total === 0 ? 0 : tally.extracted / total;
++      return {
++        extracted_token_count: tally.extracted,
++        fallback_token_count: tally.fallback,
++        total_tokens: total,
++        extraction_ratio: Number(ratio.toFixed(2)),
++        fallback_tokens: tally.fallbackTokens,
++      };
++    })();
++
++    return { brand, logos, colors, fonts, brand_voice, photo_style, graphics, icons, layout_patterns, spacing, extraction_quality: extractionQuality };
+   });
+ 
+   // Add metadata
+   extracted.metadata = {
+     analysis_date: new Date().toISOString().split('T')[0],
+     source_url: url,
+-    analysis_method: 'Automated web crawling with Puppeteer computed style extraction'
++    analysis_method: 'Automated web crawling with Puppeteer computed style extraction',
++    extraction_quality: extracted.extraction_quality,
+   };
+ 
+   return extracted;
+@@ -542,6 +605,7 @@ async function extractContent(page) {
+       heroCaption: '',
+       paragraphs: [],
+       categories: [],
++      url: window.location.href,
+       siteName: getMeta('og:site_name') || document.title.split(/[|\-–—]/)[0].trim()
+     };
+ 
+@@ -645,4 +709,93 @@ async function extractNavigation(page) {
+   });
+ }
+ 
+-module.exports = { extractBrandKit, extractContent, extractNavigation };
++/**
++ * Extract real article cards (related / popular / latest / sidebar lists) so the
++ * feed prototype can render the publisher's actual content instead of a hardcoded
++ * sponsor pool. Looks at multiple common patterns and de-duplicates by href.
++ *
++ * @param {import('puppeteer-core').Page} page
++ * @param {string} sourceUrl  The article URL (used to resolve relative hrefs and
++ *                            to drop the article we crawled for the hero)
++ * @returns {Promise<Array<{headline:string, href:string, thumbnail:string|null, category:string|null, source:'extracted'}>>}
++ */
++async function extractRelatedArticles(page, sourceUrl) {
++  return page.evaluate((sourceUrl) => {
++    const results = [];
++    const seen = new Set();
++
++    // Containers that typically hold article links on a publisher article page
++    // or homepage. We pull anchors with substantial visible text + (ideally) an
++    // image, then filter to URLs that look like articles.
++    const containerSelectors = [
++      '[class*="related"]', '[class*="Related"]',
++      '[class*="recommend"]', '[class*="Recommend"]',
++      '[class*="more-from"]', '[class*="more_from"]',
++      '[class*="popular"]', '[class*="Popular"]',
++      '[class*="trending"]', '[class*="Trending"]',
++      '[class*="latest"]', '[class*="Latest"]',
++      '[class*="read-next"]', '[class*="ReadNext"]', '[class*="up-next"]',
++      'aside', '[role="complementary"]',
++      '[class*="story-list"]', '[class*="story-card"]', '[class*="StoryCard"]',
++      '[class*="article-list"]', '[class*="articleList"]',
++      '[class*="card-grid"]', '[class*="card-list"]',
++      'main',
++    ];
++
++    const looksLikeArticleHref = (href) => {
++      try {
++        const u = new URL(href, window.location.origin);
++        if (u.origin !== window.location.origin) return false;
++        if (/\.(jpg|png|gif|svg|webp|mp4|pdf)(\?|$)/i.test(u.pathname)) return false;
++        if (/^\/(tag|category|author|search|login|subscribe|account)\b/i.test(u.pathname)) return false;
++        // typical article paths have multiple segments or a numeric/slug-looking tail
++        const segments = u.pathname.split('/').filter(Boolean);
++        return segments.length >= 2 || /[a-z0-9-]{8,}/i.test(u.pathname);
++      } catch { return false; }
++    };
++
++    const sourcePath = (() => { try { return new URL(sourceUrl).pathname; } catch { return ''; } })();
++
++    const harvest = (root) => {
++      const anchors = root.querySelectorAll('a[href]');
++      for (const a of anchors) {
++        const href = a.href;
++        if (seen.has(href)) continue;
++        if (!looksLikeArticleHref(href)) continue;
++        try { if (new URL(href).pathname === sourcePath) continue; } catch {}
++
++        // Headline = the largest piece of visible text in the anchor (or its descendants)
++        const candidates = [a.getAttribute('aria-label'), a.getAttribute('title'),
++          ...Array.from(a.querySelectorAll('h1,h2,h3,h4,[class*="headline"],[class*="title"]')).map(n => n.textContent),
++          a.textContent].filter(Boolean).map(s => s.trim());
++        const headline = candidates.find(t => t.length >= 18 && t.length <= 200);
++        if (!headline) continue;
++
++        // Thumbnail: nearest img in the anchor or its enclosing card
++        const card = a.closest('article, li, [class*="card"], [class*="Card"], [class*="item"], div') || a;
++        const img = card.querySelector('img');
++        let thumbnail = null;
++        if (img) {
++          thumbnail = img.currentSrc || img.src || img.getAttribute('data-src') || img.getAttribute('data-lazy-src');
++          if (thumbnail && thumbnail.startsWith('//')) thumbnail = 'https:' + thumbnail;
++        }
++
++        // Category / kicker: look for a tag/eyebrow inside the same card
++        const kicker = card.querySelector('[class*="kicker"], [class*="eyebrow"], [class*="category"], [class*="Category"], [class*="topic"]');
++        const category = kicker ? kicker.textContent.trim().slice(0, 30) : null;
++
++        seen.add(href);
++        results.push({ headline, href, thumbnail, category, source: 'extracted' });
++      }
++    };
++
++    for (const sel of containerSelectors) {
++      document.querySelectorAll(sel).forEach(harvest);
++      if (results.length >= 24) break;
++    }
++
++    return results.slice(0, 24);
++  }, sourceUrl);
++}
++
++module.exports = { extractBrandKit, extractContent, extractNavigation, extractRelatedArticles };
+diff --git a/lib/feed-content.js b/lib/feed-content.js
+index f5dc27f..f973d2e 100644
+--- a/lib/feed-content.js
++++ b/lib/feed-content.js
+@@ -54,14 +54,56 @@ function pickRandom(arr, n) {
+ }
+ 
+ /**
+- * Generate native cards using publisher's own navigation categories
++ * Generate native cards. Strongly prefers real, extracted articles from the page
++ * (the article we crawled + any related/recommended articles we found). Falls
++ * back to synthetic template headlines only when the page didn't expose enough
++ * sibling content; synthetic cards are tagged so the analysis report can flag
++ * how much of the feed is real vs. placeholder.
++ *
++ * @param {object} brandKit
++ * @param {object} navigation
++ * @param {{ content?: object, relatedArticles?: Array<object> }} [extras]
+  */
+-function generateNativeCards(brandKit, navigation) {
++function generateNativeCards(brandKit, navigation, extras = {}) {
+   const publisherName = (brandKit.brand && brandKit.brand.name) || 'Publisher';
+   const navLinks = (navigation && navigation.navLinks) || [];
+   const categories = navLinks.slice(0, 8).map(l => l.text || l.label).filter(Boolean);
++  const content = extras.content || {};
++  const related = Array.isArray(extras.relatedArticles) ? extras.relatedArticles : [];
++
++  const real = [];
++
++  // 1. The article we actually crawled becomes the first native card.
++  if (content && content.headline) {
++    real.push({
++      headline: content.headline,
++      category: (content.categories && content.categories[0]) || categories[0] || 'Featured',
++      source: publisherName,
++      thumbnail: content.heroImage || null,
++      href: content.url || null,
++      isNative: true,
++      contentSource: 'extracted',
++    });
++  }
+ 
+-  const nativeHeadlines = [
++  // 2. Related/recommended articles harvested from the page.
++  for (const r of related) {
++    if (real.length >= 12) break;
++    real.push({
++      headline: r.headline,
++      category: r.category || categories[real.length % Math.max(1, categories.length)] || 'News',
++      source: publisherName,
++      thumbnail: r.thumbnail || null,
++      href: r.href || null,
++      isNative: true,
++      contentSource: 'extracted',
++    });
++  }
++
++  // 3. If we still need more cards (typical when crawling a single article
++  // page that doesn't surface a related list), top up with synthetic
++  // placeholders — clearly tagged so the report can warn.
++  const syntheticHeadlines = [
+     { headline: 'Breaking: Major Policy Shift Expected This Week', category: categories[0] || 'News' },
+     { headline: 'Markets Rally as Earnings Season Exceeds Expectations', category: categories[1] || 'Business' },
+     { headline: 'New Study Reveals Surprising Health Benefits of Coffee', category: categories[2] || 'Health' },
+@@ -73,28 +115,39 @@ function generateNativeCards(brandKit, navigation) {
+     { headline: 'Review: The Year\'s Most Anticipated Film Delivers', category: categories[2] || 'Entertainment' },
+     { headline: 'Local Business Boom: Small Shops See Record Growth', category: categories[3] || 'Business' },
+   ];
++  for (let i = 0; real.length < 10 && i < syntheticHeadlines.length; i++) {
++    real.push({
++      ...syntheticHeadlines[i],
++      source: publisherName,
++      thumbnail: `https://picsum.photos/seed/nat${i + 1}/400/300`,
++      isNative: true,
++      contentSource: 'synthetic',
++    });
++  }
+ 
+-  return nativeHeadlines.map((item, i) => ({
+-    ...item,
+-    source: publisherName,
+-    thumbnail: `https://picsum.photos/seed/nat${i + 1}/400/300`,
+-    isNative: true,
+-  }));
++  return real;
+ }
+ 
+ /**
+- * Generate all feed content sections
++ * Generate all feed content sections.
++ *
+  * @param {object} brandKit
+  * @param {object} navigation
++ * @param {{ content?: object, relatedArticles?: Array<object> }} [extras]
++ *        Real article data extracted by the crawler. When provided, native
++ *        feed cards are populated from it instead of from a hardcoded pool.
+  * @returns {object} Feed content sections
+  */
+-function generateFeedContent(brandKit, navigation) {
++function generateFeedContent(brandKit, navigation, extras = {}) {
+   const sponsored = pickRandom(SPONSORED_POOL, 12).map((card, i) => ({
+     ...card,
+     thumbnail: THUMBNAIL_PLACEHOLDERS[i % THUMBNAIL_PLACEHOLDERS.length],
++    contentSource: 'synthetic', // sponsored content is intentionally generic — we don't fabricate paid placements
+   }));
+ 
+-  const native = generateNativeCards(brandKit, navigation);
++  const native = generateNativeCards(brandKit, navigation, extras);
++
++  const realNativeCount = native.filter(n => n.contentSource === 'extracted').length;
+ 
+   return {
+     sponsoredLarge: sponsored.slice(0, 2),
+@@ -103,6 +156,11 @@ function generateFeedContent(brandKit, navigation) {
+     sponsoredMixed: sponsored.slice(5, 7),
+     trendingNative: native.slice(3, 7),
+     sponsoredFinal: sponsored.slice(7, 9),
++    _meta: {
++      native_extracted_count: realNativeCount,
++      native_synthetic_count: native.length - realNativeCount,
++      native_total: native.length,
++    },
+   };
+ }
+ 
