@@ -403,6 +403,23 @@ function setupPreview() {
     download(`${slug(state.publisher.domain)}.article-prototype.html`, state.generated.html, "text/html");
     showToast("HTML downloaded");
   });
+  document.getElementById("btn-copy-css").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(state.generated.css);
+      showToast("CSS copied to clipboard");
+    } catch {
+      // Fallback for browsers without async clipboard.
+      const ta = document.createElement("textarea");
+      ta.value = state.generated.css;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+      showToast("CSS copied to clipboard");
+    }
+  });
 }
 
 // ---------- Navigation ----------
