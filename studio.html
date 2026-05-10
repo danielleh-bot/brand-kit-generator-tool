@@ -1,0 +1,2869 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Brand Kit Studio — generate a publisher CSS kit & live article preview</title>
+    <meta
+      name="description"
+      content="Turn any publisher URL into a polished brand kit, a portable CSS file, and a fully styled article prototype with the new feed experience."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;800&family=Fraunces:wght@600;700;800&family=Source+Serif+4:wght@500;600;700&family=Merriweather:wght@700;800&family=DM+Serif+Display&family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@500;600;700&family=Work+Sans:wght@500;600;700&family=IBM+Plex+Sans:wght@500;600;700&family=Lora:wght@500;600;700&family=JetBrains+Mono:wght@500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+/* ---------- Tokens ---------- */
+:root {
+  --bg-0: #07070d;
+  --bg-1: #0c0d18;
+  --bg-2: #11132166;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.18);
+  --text: #f4f5fb;
+  --text-dim: #a4a8c2;
+  --text-faint: #6f7396;
+  --accent-1: #7c5cff;
+  --accent-2: #22d3ee;
+  --accent-3: #f472b6;
+  --success: #4ade80;
+  --danger: #f87171;
+  --radius-sm: 10px;
+  --radius: 14px;
+  --radius-lg: 22px;
+  --shadow-1: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 10px 30px -12px rgba(0, 0, 0, 0.6);
+  --shadow-2: 0 30px 80px -30px rgba(124, 92, 255, 0.45);
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: radial-gradient(1200px 600px at 80% -10%, rgba(124, 92, 255, 0.18), transparent 60%),
+    radial-gradient(900px 600px at -10% 30%, rgba(34, 211, 238, 0.14), transparent 60%),
+    linear-gradient(180deg, var(--bg-0), var(--bg-1));
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+button {
+  font-family: inherit;
+}
+
+code,
+pre {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* ---------- Aurora background ---------- */
+.aurora {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  filter: blur(80px) saturate(140%);
+  pointer-events: none;
+}
+.aurora__blob {
+  position: absolute;
+  width: 520px;
+  height: 520px;
+  border-radius: 50%;
+  opacity: 0.55;
+  mix-blend-mode: screen;
+  animation: drift 22s var(--ease) infinite alternate;
+}
+.aurora__blob--a { background: #7c5cff; top: -120px; left: -100px; animation-delay: -4s; }
+.aurora__blob--b { background: #22d3ee; bottom: -160px; right: -120px; animation-delay: -10s; }
+.aurora__blob--c { background: #f472b6; top: 30%; left: 40%; opacity: 0.35; animation-delay: -14s; }
+@keyframes drift {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  50%  { transform: translate3d(40px, -30px, 0) scale(1.08); }
+  100% { transform: translate3d(-30px, 40px, 0) scale(0.96); }
+}
+
+/* ---------- Layout ---------- */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 24px;
+  padding: 18px 28px;
+  backdrop-filter: blur(18px);
+  background: linear-gradient(180deg, rgba(8, 9, 18, 0.7), rgba(8, 9, 18, 0.3));
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.brand__mark {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+}
+.brand__text { display: flex; flex-direction: column; line-height: 1.05; }
+.brand__title { font-weight: 700; letter-spacing: -0.01em; }
+.brand__sub { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.14em; }
+
+.stepper__list {
+  list-style: none;
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.stepper__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--line);
+  transition: all 0.4s var(--ease);
+}
+.stepper__item .num {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  display: inline-grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+.stepper__item.is-active {
+  color: var(--text);
+  background: linear-gradient(180deg, rgba(124, 92, 255, 0.18), rgba(34, 211, 238, 0.1));
+  border-color: rgba(124, 92, 255, 0.4);
+  box-shadow: 0 0 0 4px rgba(124, 92, 255, 0.08);
+}
+.stepper__item.is-active .num {
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  color: #0b0c14;
+}
+.stepper__item.is-done { color: var(--text-dim); }
+.stepper__item.is-done .num { background: rgba(74, 222, 128, 0.18); color: var(--success); }
+
+.step-counter {
+  font-size: 12px;
+  color: var(--text-faint);
+  letter-spacing: 0.04em;
+}
+
+.wizard {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 48px 28px 140px;
+  min-height: calc(100vh - 76px - 92px);
+}
+
+/* ---------- Step base ---------- */
+.step {
+  animation: stepIn 0.5s var(--ease-out) both;
+}
+.step--center {
+  display: grid;
+  place-items: center;
+  min-height: 60vh;
+}
+.step--full {
+  max-width: none;
+}
+@keyframes stepIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.step__head {
+  margin-bottom: 28px;
+}
+.step__head--row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+.step__kicker {
+  display: inline-block;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+  margin-bottom: 10px;
+}
+.step__title {
+  font-size: clamp(28px, 3.4vw, 40px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin: 0 0 10px;
+}
+.step__sub {
+  color: var(--text-dim);
+  max-width: 64ch;
+  font-size: 15px;
+  line-height: 1.55;
+  margin: 0;
+}
+
+/* ---------- Welcome / Hero ---------- */
+.step--welcome {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 48px;
+  align-items: center;
+  min-height: 60vh;
+}
+@media (max-width: 880px) {
+  .step--welcome { grid-template-columns: 1fr; }
+}
+
+.hero__eyebrow {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-dim);
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  margin-bottom: 18px;
+}
+.hero__eyebrow .dot {
+  width: 8px; height: 8px; border-radius: 999px;
+  background: var(--success);
+  box-shadow: 0 0 0 4px rgba(74, 222, 128, 0.16);
+}
+.hero__title {
+  font-size: clamp(36px, 5.2vw, 64px);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.02;
+  margin: 0 0 18px;
+}
+.grad {
+  background: linear-gradient(120deg, var(--accent-1), var(--accent-2) 60%, var(--accent-3));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.hero__lede {
+  color: var(--text-dim);
+  font-size: 17px;
+  line-height: 1.6;
+  margin: 0 0 22px;
+  max-width: 56ch;
+}
+.hero__bullets {
+  list-style: none;
+  margin: 0 0 30px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  color: var(--text-dim);
+  font-size: 15px;
+}
+.hero__bullets li { display: flex; gap: 10px; align-items: center; }
+.check {
+  width: 18px; height: 18px;
+  border-radius: 999px;
+  display: inline-grid; place-items: center;
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  position: relative;
+  flex: 0 0 18px;
+}
+.check::after {
+  content: "";
+  width: 8px; height: 4px;
+  border-left: 2px solid #0b0c14;
+  border-bottom: 2px solid #0b0c14;
+  transform: rotate(-45deg) translate(1px, -1px);
+}
+.hero__cta { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.hero__time { color: var(--text-faint); font-size: 13px; }
+code { background: rgba(255,255,255,.06); padding: 1px 6px; border-radius: 6px; font-size: 12px; color: var(--text); }
+
+.hero__visual {
+  position: relative;
+  height: 360px;
+}
+.card-stack { position: relative; width: 100%; height: 100%; perspective: 1200px; }
+.card-mini {
+  position: absolute;
+  width: 220px;
+  padding: 18px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-1);
+  display: flex; flex-direction: column; gap: 10px;
+  animation: float 8s var(--ease) infinite alternate;
+}
+.card-mini--1 { top: 30px; left: 20px; transform: rotate(-6deg); }
+.card-mini--2 { top: 100px; left: 130px; animation-delay: -3s; transform: rotate(2deg); }
+.card-mini--3 { top: 200px; left: 60px; animation-delay: -5s; transform: rotate(-3deg); width: 240px; }
+.bar {
+  height: 10px; border-radius: 4px;
+  background: linear-gradient(90deg, rgba(124,92,255,.7), rgba(34,211,238,.5));
+}
+.bar--w90 { width: 90%; } .bar--w70 { width: 70%; } .bar--w60 { width: 60%; } .bar--w50 { width: 50%; } .bar--w40 { width: 40%; }
+.palette-mini { display: flex; gap: 8px; }
+.palette-mini span {
+  width: 36px; height: 36px; border-radius: 10px; flex: 0 0 auto;
+  border: 1px solid rgba(255,255,255,.1);
+}
+.palette-mini span:nth-child(1) { background: #7c5cff; }
+.palette-mini span:nth-child(2) { background: #22d3ee; }
+.palette-mini span:nth-child(3) { background: #f472b6; }
+.palette-mini span:nth-child(4) { background: #fbbf24; }
+.palette-mini span:nth-child(5) { background: #1f2333; }
+@keyframes float {
+  from { transform: translate3d(0,0,0) rotate(var(--r,0deg)); }
+  to   { transform: translate3d(0,-12px,0) rotate(var(--r,0deg)); }
+}
+
+/* ---------- Buttons ---------- */
+.btn {
+  --bg: rgba(255,255,255,.04);
+  --fg: var(--text);
+  --bd: var(--line);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 18px;
+  border-radius: 12px;
+  border: 1px solid var(--bd);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s var(--ease), background 0.2s var(--ease), border-color 0.2s var(--ease), opacity 0.2s var(--ease);
+}
+.btn:hover { background: rgba(255,255,255,.08); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn--primary {
+  --bg: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  --fg: #0b0c14;
+  --bd: transparent;
+  box-shadow: var(--shadow-2);
+}
+.btn--primary:hover { filter: brightness(1.08); background: var(--bg); }
+.btn--ghost { --bg: transparent; }
+.btn--lg { padding: 14px 22px; font-size: 15px; border-radius: 14px; }
+
+/* ---------- Footer nav ---------- */
+.footer {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 30;
+  background: linear-gradient(180deg, rgba(8,9,18,0.0), rgba(8,9,18,0.85));
+  backdrop-filter: blur(14px);
+  border-top: 1px solid var(--line);
+}
+.footer__nav {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 28px;
+}
+.footer__progress { display: flex; align-items: center; }
+.progress {
+  display: block;
+  height: 4px;
+  width: 100%;
+  border-radius: 999px;
+  background: rgba(255,255,255,.06);
+  overflow: hidden;
+}
+.progress__bar {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent-1), var(--accent-2));
+  transition: width 0.6s var(--ease-out);
+}
+
+/* ---------- Forms ---------- */
+.form {
+  display: grid;
+  gap: 18px;
+  max-width: 640px;
+}
+.field { display: grid; gap: 8px; }
+.field__label {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.field__input {
+  display: flex;
+  align-items: center;
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
+}
+.field__input:focus-within {
+  border-color: rgba(124, 92, 255, 0.6);
+  background: rgba(124, 92, 255, 0.06);
+  box-shadow: 0 0 0 4px rgba(124, 92, 255, 0.12);
+}
+.field__input--with-prefix .field__prefix {
+  padding: 0 4px 0 14px;
+  color: var(--text-faint);
+  font-size: 14px;
+}
+.field__input input {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: var(--text);
+  font-size: 15px;
+  padding: 14px 14px 14px 8px;
+  font-family: inherit;
+}
+.field__error { min-height: 16px; color: var(--danger); font-size: 12.5px; }
+.field--inline .field__input { background: transparent; border: 0; padding: 0; }
+.field--inline .field__input input { padding: 8px 0; font-size: 18px; font-weight: 600; }
+.field--inline .field__input:focus-within { box-shadow: none; background: transparent; }
+
+/* ---------- Examples chips ---------- */
+.examples { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.examples__label { color: var(--text-faint); font-size: 13px; }
+.chip {
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--line);
+  color: var(--text-dim);
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s var(--ease);
+}
+.chip:hover { background: rgba(124,92,255,.1); color: var(--text); border-color: rgba(124,92,255,.4); }
+
+/* ---------- Loaders ---------- */
+.loader {
+  text-align: center;
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+}
+.loader__art { filter: drop-shadow(0 12px 40px rgba(124,92,255,.35)); }
+.loader__title { margin: 8px 0 0; font-size: 22px; font-weight: 700; }
+.loader__status {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 14px;
+  min-height: 1.5em;
+}
+
+.checks {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-dim);
+  text-align: left;
+}
+.checks li { display: flex; gap: 10px; align-items: center; }
+.checks__dot {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.18);
+  display: inline-block;
+  position: relative;
+  transition: all 0.3s var(--ease);
+}
+.checks li.is-active .checks__dot {
+  border-color: var(--accent-2);
+  box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.16);
+  animation: pulseDot 1s ease-in-out infinite;
+}
+.checks li.is-done .checks__dot {
+  border-color: var(--success);
+  background: var(--success);
+}
+.checks li.is-done .checks__dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 4px; height: 7px;
+  border-right: 2px solid #0b0c14;
+  border-bottom: 2px solid #0b0c14;
+  transform: translateY(-1px) rotate(45deg);
+}
+@keyframes pulseDot { 50% { transform: scale(1.18); } }
+
+/* Scan animation */
+.scan__lens {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: scan 3s linear infinite;
+}
+@keyframes scan {
+  0%   { transform: translate(60px, 50px); }
+  25%  { transform: translate(140px, 80px); }
+  50%  { transform: translate(120px, 150px); }
+  75%  { transform: translate(60px, 130px); }
+  100% { transform: translate(60px, 50px); }
+}
+.scan__sparks circle { animation: spark 1.6s ease-in-out infinite; }
+.scan__sparks circle:nth-child(2) { animation-delay: -0.4s; }
+.scan__sparks circle:nth-child(3) { animation-delay: -0.8s; }
+.scan__sparks circle:nth-child(4) { animation-delay: -1.2s; }
+@keyframes spark {
+  0%, 100% { opacity: 0; transform: scale(0.4); }
+  50% { opacity: 1; transform: scale(1.4); }
+}
+
+/* Mix animation */
+.mix__drops .drop {
+  fill: var(--accent-1);
+  animation: drop 1.4s var(--ease-out) infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.mix__drops .drop--2 { fill: var(--accent-2); animation-delay: -0.45s; }
+.mix__drops .drop--3 { fill: var(--accent-3); animation-delay: -0.9s; }
+@keyframes drop {
+  0%   { transform: translateY(0); opacity: 0; }
+  20%  { opacity: 1; }
+  70%  { transform: translateY(80px); opacity: 1; }
+  100% { transform: translateY(95px); opacity: 0; }
+}
+.mix__wave {
+  animation: wave 2.6s ease-in-out infinite;
+  transform-box: fill-box;
+}
+@keyframes wave {
+  0%, 100% { transform: translateX(0); }
+  50%      { transform: translateX(-30px); }
+}
+
+/* ---------- Brand identity step ---------- */
+.grid { display: grid; gap: 28px; }
+.grid--2 { grid-template-columns: 1fr 1fr; }
+@media (max-width: 880px) { .grid--2 { grid-template-columns: 1fr; } }
+
+.identity {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 12px;
+}
+.identity__avatar {
+  position: relative;
+  width: 64px; height: 64px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, rgba(124,92,255,.25), rgba(34,211,238,.18));
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.identity__avatar img { width: 36px; height: 36px; object-fit: contain; display: none; }
+.identity__avatar img.is-loaded { display: block; }
+.identity__avatar img.is-loaded ~ .identity__monogram { display: none; }
+.identity__monogram {
+  font-size: 24px; font-weight: 800; letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.palette {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+@media (max-width: 540px) { .palette { grid-template-columns: 1fr; } }
+
+.swatch {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255,255,255,.02);
+  transition: border-color 0.2s var(--ease);
+}
+.swatch:focus-within { border-color: rgba(124, 92, 255, 0.5); }
+.swatch__chip {
+  width: 56px; height: 56px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.15);
+  position: relative;
+  overflow: hidden;
+}
+.swatch__chip input[type="color"] {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  border: 0; padding: 0; background: transparent;
+  cursor: pointer;
+  opacity: 0; /* color shown via background of parent */
+}
+.swatch__meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.swatch__name { font-weight: 600; font-size: 14px; }
+.swatch__role { color: var(--text-faint); font-size: 12px; }
+.swatch__hex {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--text-dim);
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--line);
+  padding: 4px 8px;
+  border-radius: 8px;
+  text-transform: uppercase;
+}
+
+/* Preview card */
+.preview-card {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  overflow: hidden;
+  background: rgba(255,255,255,.02);
+  position: sticky;
+  top: 92px;
+}
+.preview-card__chrome {
+  display: flex; gap: 6px; padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255,255,255,.02);
+}
+.preview-card__chrome span {
+  width: 10px; height: 10px; border-radius: 999px;
+  background: rgba(255,255,255,.12);
+}
+.preview-card__chrome span:nth-child(1) { background: #ff5f57; }
+.preview-card__chrome span:nth-child(2) { background: #febc2e; }
+.preview-card__chrome span:nth-child(3) { background: #28c840; }
+.preview-card__body {
+  padding: 22px;
+  min-height: 320px;
+  display: grid;
+  gap: 14px;
+  --p-bg: #0e1020;
+  --p-fg: #f4f5fb;
+  --p-primary: #7c5cff;
+  --p-accent: #22d3ee;
+  background: var(--p-bg);
+  color: var(--p-fg);
+}
+.pv-tag {
+  display: inline-flex;
+  background: var(--p-primary);
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  width: max-content;
+}
+.pv-title {
+  font-family: var(--p-heading, "Playfair Display"), serif;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+.pv-byline { color: var(--text-dim); font-size: 13px; }
+.pv-card {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.08);
+}
+.pv-card__thumb {
+  height: 64px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--p-primary), var(--p-accent));
+}
+.pv-card__title { font-weight: 700; line-height: 1.25; }
+.pv-card__meta { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+
+/* ---------- Typography step ---------- */
+.type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+.type-card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 20px;
+  background: rgba(255,255,255,.02);
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+  text-align: left;
+  color: inherit;
+  font-family: inherit;
+}
+.type-card:hover { border-color: rgba(124, 92, 255, 0.45); transform: translateY(-2px); }
+.type-card.is-selected {
+  border-color: var(--accent-1);
+  background: linear-gradient(180deg, rgba(124,92,255,.12), rgba(34,211,238,.04));
+  box-shadow: 0 0 0 4px rgba(124, 92, 255, 0.14);
+}
+.type-card__name {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 12px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.08em;
+  margin-bottom: 14px;
+}
+.type-card__heading {
+  font-size: 26px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; margin-bottom: 8px;
+}
+.type-card__body { font-size: 14px; color: var(--text-dim); line-height: 1.55; }
+
+/* ---------- Tokens step ---------- */
+.token-group { display: grid; gap: 10px; }
+.token-group__label {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 4px;
+}
+.seg button {
+  background: transparent;
+  border: 0;
+  color: var(--text-dim);
+  padding: 8px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.18s var(--ease);
+}
+.seg button:hover { color: var(--text); background: rgba(255,255,255,.04); }
+.seg button[aria-pressed="true"] {
+  background: linear-gradient(135deg, rgba(124,92,255,.4), rgba(34,211,238,.3));
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px rgba(124,92,255,.5);
+}
+.seg--sm button { padding: 6px 12px; font-size: 13px; }
+
+.swatch-radius {
+  width: 22px; height: 22px;
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  display: inline-block;
+}
+.swatch-radius--sharp { border-radius: 0; }
+.swatch-radius--soft { border-radius: 4px; }
+.swatch-radius--rounded { border-radius: 8px; }
+.swatch-radius--pill { border-radius: 999px; }
+
+/* ---------- Preview step ---------- */
+.preview-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.device {
+  margin-top: 24px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: rgba(0,0,0,0.35);
+  padding: 14px;
+  box-shadow: var(--shadow-1);
+  transition: all 0.4s var(--ease);
+  margin-inline: auto;
+  width: 100%;
+  max-width: 1180px;
+}
+.device iframe {
+  width: 100%;
+  height: 80vh;
+  min-height: 640px;
+  border: 0;
+  border-radius: 14px;
+  background: #fff;
+  display: block;
+}
+.device--tablet { max-width: 820px; }
+.device--mobile { max-width: 420px; }
+.device--mobile iframe { min-height: 720px; }
+
+.code-drawer {
+  margin-top: 22px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255,255,255,.02);
+}
+.code-drawer summary {
+  cursor: pointer;
+  padding: 14px 18px;
+  font-size: 13px;
+  color: var(--text-dim);
+  list-style: none;
+}
+.code-drawer summary::-webkit-details-marker { display: none; }
+.code-drawer summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 8px;
+  transition: transform 0.2s var(--ease);
+}
+.code-drawer[open] summary::before { transform: rotate(90deg); }
+.code-drawer pre {
+  margin: 0;
+  padding: 0 18px 18px;
+  font-size: 12px;
+  color: var(--text-dim);
+  max-height: 360px;
+  overflow: auto;
+}
+
+/* ---------- Toast ---------- */
+.toast {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translate(-50%, 20px);
+  padding: 12px 18px;
+  border-radius: 12px;
+  background: rgba(20, 22, 38, 0.92);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(10px);
+  font-size: 13.5px;
+  color: var(--text);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.3s var(--ease);
+  z-index: 50;
+}
+.toast.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+</style>
+  </head>
+  <body>
+    <div class="aurora" aria-hidden="true">
+      <span class="aurora__blob aurora__blob--a"></span>
+      <span class="aurora__blob aurora__blob--b"></span>
+      <span class="aurora__blob aurora__blob--c"></span>
+    </div>
+
+    <header class="topbar" role="banner">
+      <div class="brand">
+        <span class="brand__mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" width="28" height="28">
+            <defs>
+              <linearGradient id="bk-mark" x1="0" x2="1" y1="0" y2="1">
+                <stop offset="0" stop-color="#7c5cff" />
+                <stop offset="1" stop-color="#22d3ee" />
+              </linearGradient>
+            </defs>
+            <rect x="2" y="2" width="28" height="28" rx="9" fill="url(#bk-mark)" />
+            <path
+              d="M11 22V10h5.2c2.4 0 3.9 1.2 3.9 3.1 0 1.3-.7 2.2-1.9 2.6 1.5.3 2.4 1.4 2.4 2.9 0 2-1.6 3.4-4.1 3.4H11Zm2.5-7.2h2.3c1.1 0 1.8-.5 1.8-1.4 0-.9-.7-1.4-1.8-1.4h-2.3v2.8Zm0 5.1h2.5c1.2 0 2-.6 2-1.6s-.7-1.6-2-1.6h-2.5v3.2Z"
+              fill="#0b0c14"
+            />
+          </svg>
+        </span>
+        <div class="brand__text">
+          <span class="brand__title">Brand Kit Studio</span>
+          <span class="brand__sub">Publisher edition</span>
+        </div>
+      </div>
+      <nav class="stepper" aria-label="Progress">
+        <ol id="stepper" class="stepper__list"></ol>
+      </nav>
+      <div class="topbar__meta">
+        <span id="step-counter" class="step-counter" aria-live="polite">Step 1 of 7</span>
+      </div>
+    </header>
+
+    <main id="wizard" class="wizard" role="main" aria-live="polite"></main>
+
+    <footer class="footer" role="contentinfo">
+      <div class="footer__nav">
+        <button id="btn-back" class="btn btn--ghost" type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+          Back
+        </button>
+        <div class="footer__progress">
+          <span class="progress" aria-hidden="true"><span id="progress-bar" class="progress__bar"></span></span>
+        </div>
+        <button id="btn-next" class="btn btn--primary" type="button">
+          <span id="btn-next-label">Continue</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+      </div>
+    </footer>
+
+    <!-- Step templates -->
+    <template id="tpl-welcome">
+      <section class="step step--welcome" data-step="welcome">
+        <div class="hero">
+          <div class="hero__eyebrow">
+            <span class="dot"></span> A wizard for publisher brand kits
+          </div>
+          <h1 class="hero__title">
+            Turn any publisher into a
+            <span class="grad">living brand kit</span>
+            in under a minute.
+          </h1>
+          <p class="hero__lede">
+            Drop in a URL. We'll extract the brand, build a polished CSS file, and render a real
+            article page with the new feed experience — fully themed, fully yours.
+          </p>
+          <ul class="hero__bullets">
+            <li><span class="check"></span> Auto-detect colors from the publisher's favicon</li>
+            <li><span class="check"></span> Fine-tune palette, typography & style tokens</li>
+            <li><span class="check"></span> Export a portable <code>brand-kit.css</code></li>
+            <li><span class="check"></span> Preview a live article + new feed prototype</li>
+          </ul>
+          <div class="hero__cta">
+            <button class="btn btn--primary btn--lg" data-action="start">
+              Start the wizard
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+            </button>
+            <span class="hero__time">~ 60 seconds</span>
+          </div>
+        </div>
+        <div class="hero__visual" aria-hidden="true">
+          <div class="card-stack">
+            <div class="card-mini card-mini--1">
+              <span class="bar bar--w70"></span>
+              <span class="bar bar--w50"></span>
+              <span class="bar bar--w90"></span>
+            </div>
+            <div class="card-mini card-mini--2">
+              <span class="bar bar--w90"></span>
+              <span class="bar bar--w60"></span>
+              <span class="bar bar--w40"></span>
+            </div>
+            <div class="card-mini card-mini--3">
+              <div class="palette-mini">
+                <span></span><span></span><span></span><span></span><span></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </template>
+
+    <template id="tpl-url">
+      <section class="step" data-step="url">
+        <header class="step__head">
+          <span class="step__kicker">Step 1 — Source</span>
+          <h2 class="step__title">Which publisher are we kitting out?</h2>
+          <p class="step__sub">
+            Paste any publisher URL. We'll fetch the favicon, sample its colors, and use the
+            domain as the working brand name. You can adjust everything in the next step.
+          </p>
+        </header>
+        <div class="form">
+          <label class="field">
+            <span class="field__label">Publisher URL</span>
+            <div class="field__input field__input--with-prefix">
+              <span class="field__prefix">https://</span>
+              <input
+                id="input-url"
+                type="text"
+                placeholder="www.theverge.com"
+                autocomplete="off"
+                spellcheck="false"
+                autofocus
+              />
+            </div>
+            <span id="url-error" class="field__error"></span>
+          </label>
+          <div class="examples">
+            <span class="examples__label">Try one:</span>
+            <button class="chip" data-example="www.theverge.com">The Verge</button>
+            <button class="chip" data-example="www.nytimes.com">NYT</button>
+            <button class="chip" data-example="www.bbc.com">BBC</button>
+            <button class="chip" data-example="techcrunch.com">TechCrunch</button>
+            <button class="chip" data-example="www.economist.com">The Economist</button>
+          </div>
+        </div>
+      </section>
+    </template>
+
+    <template id="tpl-analyzing">
+      <section class="step step--center" data-step="analyzing">
+        <div class="loader">
+          <div class="loader__art loader__art--scan">
+            <svg viewBox="0 0 200 200" width="200" height="200" aria-hidden="true">
+              <defs>
+                <linearGradient id="scan-grad" x1="0" x2="1" y1="0" y2="1">
+                  <stop offset="0" stop-color="var(--accent-1)" />
+                  <stop offset="1" stop-color="var(--accent-2)" />
+                </linearGradient>
+                <radialGradient id="scan-globe" cx="50%" cy="50%" r="50%">
+                  <stop offset="0" stop-color="rgba(255,255,255,.18)" />
+                  <stop offset="1" stop-color="rgba(255,255,255,0)" />
+                </radialGradient>
+              </defs>
+              <circle cx="100" cy="100" r="62" fill="url(#scan-globe)" stroke="rgba(255,255,255,.18)" stroke-width="1.2"/>
+              <ellipse cx="100" cy="100" rx="62" ry="22" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="1.2"/>
+              <ellipse cx="100" cy="100" rx="22" ry="62" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="1.2"/>
+              <g class="scan__lens">
+                <circle cx="0" cy="0" r="22" fill="none" stroke="url(#scan-grad)" stroke-width="3"/>
+                <line x1="16" y1="16" x2="32" y2="32" stroke="url(#scan-grad)" stroke-width="3" stroke-linecap="round"/>
+                <circle cx="0" cy="0" r="22" fill="rgba(124,92,255,.08)"/>
+              </g>
+              <g class="scan__sparks">
+                <circle cx="60" cy="50" r="2" fill="var(--accent-1)"/>
+                <circle cx="150" cy="80" r="2" fill="var(--accent-2)"/>
+                <circle cx="130" cy="150" r="2" fill="#fff"/>
+                <circle cx="55" cy="140" r="2" fill="var(--accent-1)"/>
+              </g>
+            </svg>
+          </div>
+          <h3 class="loader__title">Analyzing the publisher…</h3>
+          <p id="loader-status" class="loader__status">Fetching favicon</p>
+          <ul class="checks">
+            <li id="check-fetch"><span class="checks__dot"></span> Fetch site icon</li>
+            <li id="check-extract"><span class="checks__dot"></span> Sample dominant colors</li>
+            <li id="check-tokens"><span class="checks__dot"></span> Build initial brand tokens</li>
+          </ul>
+        </div>
+      </section>
+    </template>
+
+    <template id="tpl-brand">
+      <section class="step" data-step="brand">
+        <header class="step__head">
+          <span class="step__kicker">Step 2 — Brand identity</span>
+          <h2 class="step__title">Here's what we found. Tweak away.</h2>
+          <p class="step__sub">
+            Adjust the palette to match the publisher's voice. Each swatch updates the live
+            preview on the right.
+          </p>
+        </header>
+        <div class="grid grid--2">
+          <div class="form">
+            <div class="identity">
+              <div class="identity__avatar">
+                <img id="brand-favicon" alt="" />
+                <span id="brand-monogram" class="identity__monogram"></span>
+              </div>
+              <label class="field field--inline">
+                <span class="field__label">Publisher name</span>
+                <div class="field__input">
+                  <input id="input-name" type="text" autocomplete="off" />
+                </div>
+              </label>
+            </div>
+            <div class="palette" id="palette"></div>
+          </div>
+          <aside class="preview-card" aria-label="Live preview">
+            <div class="preview-card__chrome">
+              <span></span><span></span><span></span>
+            </div>
+            <div class="preview-card__body" id="brand-preview"></div>
+          </aside>
+        </div>
+      </section>
+    </template>
+
+    <template id="tpl-typography">
+      <section class="step" data-step="typography">
+        <header class="step__head">
+          <span class="step__kicker">Step 3 — Typography</span>
+          <h2 class="step__title">Pick a voice for headlines &amp; body.</h2>
+          <p class="step__sub">
+            Pair a display face with a readable body face. Hover any combo to preview it
+            instantly.
+          </p>
+        </header>
+        <div class="type-grid" id="type-grid"></div>
+      </section>
+    </template>
+
+    <template id="tpl-tokens">
+      <section class="step" data-step="tokens">
+        <header class="step__head">
+          <span class="step__kicker">Step 4 — Style tokens</span>
+          <h2 class="step__title">Set the rhythm.</h2>
+          <p class="step__sub">
+            Roundness and density define how the brand feels. Pick what fits the publisher's
+            personality.
+          </p>
+        </header>
+        <div class="form">
+          <div class="token-group">
+            <span class="token-group__label">Corner radius</span>
+            <div class="seg" data-token="radius">
+              <button data-value="sharp"><span class="swatch-radius swatch-radius--sharp"></span><span>Sharp</span></button>
+              <button data-value="soft"><span class="swatch-radius swatch-radius--soft"></span><span>Soft</span></button>
+              <button data-value="rounded"><span class="swatch-radius swatch-radius--rounded"></span><span>Rounded</span></button>
+              <button data-value="pill"><span class="swatch-radius swatch-radius--pill"></span><span>Pill</span></button>
+            </div>
+          </div>
+          <div class="token-group">
+            <span class="token-group__label">Density</span>
+            <div class="seg" data-token="density">
+              <button data-value="compact"><span>Compact</span></button>
+              <button data-value="comfortable"><span>Comfortable</span></button>
+              <button data-value="spacious"><span>Spacious</span></button>
+            </div>
+          </div>
+          <div class="token-group">
+            <span class="token-group__label">Mood</span>
+            <div class="seg" data-token="mood">
+              <button data-value="light"><span>Light</span></button>
+              <button data-value="dark"><span>Dark</span></button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </template>
+
+    <template id="tpl-generating">
+      <section class="step step--center" data-step="generating">
+        <div class="loader">
+          <div class="loader__art loader__art--mix">
+            <svg viewBox="0 0 220 220" width="220" height="220" aria-hidden="true">
+              <defs>
+                <linearGradient id="beaker-grad" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0" stop-color="var(--accent-1)"/>
+                  <stop offset="1" stop-color="var(--accent-2)"/>
+                </linearGradient>
+              </defs>
+              <g class="mix__drops">
+                <circle class="drop drop--1" cx="80" cy="20" r="6"/>
+                <circle class="drop drop--2" cx="110" cy="20" r="6"/>
+                <circle class="drop drop--3" cx="140" cy="20" r="6"/>
+              </g>
+              <path d="M70 90 L70 70 L150 70 L150 90 L180 170 Q180 195 155 195 L65 195 Q40 195 40 170 Z"
+                    fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.35)" stroke-width="2.5" stroke-linejoin="round"/>
+              <clipPath id="beaker-clip">
+                <path d="M70 90 L70 72 L150 72 L150 90 L178 168 Q178 192 155 192 L65 192 Q42 192 42 168 Z"/>
+              </clipPath>
+              <g clip-path="url(#beaker-clip)">
+                <rect class="mix__liquid" x="0" y="120" width="220" height="120" fill="url(#beaker-grad)"/>
+                <path class="mix__wave" d="M0 130 Q 30 120 60 130 T 120 130 T 180 130 T 240 130 V 220 H 0 Z" fill="url(#beaker-grad)" opacity=".7"/>
+              </g>
+            </svg>
+          </div>
+          <h3 class="loader__title">Mixing your brand kit…</h3>
+          <p id="gen-status" class="loader__status">Compiling tokens</p>
+          <ul class="checks">
+            <li id="check-css"><span class="checks__dot"></span> Compile CSS variables</li>
+            <li id="check-components"><span class="checks__dot"></span> Style components</li>
+            <li id="check-prototype"><span class="checks__dot"></span> Render article prototype</li>
+          </ul>
+        </div>
+      </section>
+    </template>
+
+    <template id="tpl-preview">
+      <section class="step step--full" data-step="preview">
+        <header class="step__head step__head--row">
+          <div>
+            <span class="step__kicker">Step 5 — Preview &amp; export</span>
+            <h2 class="step__title">Your brand kit is ready.</h2>
+            <p class="step__sub">
+              The article below is a live HTML prototype with the new feed experience, styled by
+              your generated CSS. Toggle device sizes and download the kit when you're happy.
+            </p>
+          </div>
+          <div class="preview-actions">
+            <div class="seg seg--sm" id="device-toggle">
+              <button data-device="desktop" aria-pressed="true">Desktop</button>
+              <button data-device="tablet">Tablet</button>
+              <button data-device="mobile">Mobile</button>
+            </div>
+            <button id="btn-download-css" class="btn btn--primary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              Download CSS
+            </button>
+            <button id="btn-download-html" class="btn btn--ghost">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              Download HTML
+            </button>
+          </div>
+        </header>
+        <div class="device" id="device-frame">
+          <iframe id="prototype-frame" title="Article prototype" sandbox="allow-same-origin allow-scripts"></iframe>
+        </div>
+        <details class="code-drawer">
+          <summary>Peek at the generated CSS</summary>
+          <pre><code id="css-output"></code></pre>
+        </details>
+      </section>
+    </template>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script>
+// ---------- src/utils.js ----------
+// Color & string utilities shared across modules.
+function hexToRgb(hex) {
+  const h = hex.replace("#", "");
+  const v = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  return {
+    r: parseInt(v.slice(0, 2), 16),
+    g: parseInt(v.slice(2, 4), 16),
+    b: parseInt(v.slice(4, 6), 16)
+  };
+}
+function rgbToHex(r, g, b) {
+  return "#" + [r, g, b].map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("");
+}
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0;
+  const l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)); break;
+      case g: h = ((b - r) / d + 2); break;
+      case b: h = ((r - g) / d + 4); break;
+    }
+    h /= 6;
+  }
+  return { h: h * 360, s: s * 100, l: l * 100 };
+}
+function hslToRgb(h, s, l) {
+  h /= 360; s /= 100; l /= 100;
+  if (s === 0) { const v = Math.round(l * 255); return { r: v, g: v, b: v }; }
+  const hue2rgb = (p, q, t) => {
+    if (t < 0) t += 1; if (t > 1) t -= 1;
+    if (t < 1/6) return p + (q - p) * 6 * t;
+    if (t < 1/2) return q;
+    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+    return p;
+  };
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  return {
+    r: Math.round(hue2rgb(p, q, h + 1/3) * 255),
+    g: Math.round(hue2rgb(p, q, h) * 255),
+    b: Math.round(hue2rgb(p, q, h - 1/3) * 255)
+  };
+}
+function mix(a, b, t) {
+  const A = hexToRgb(a), B = hexToRgb(b);
+  return rgbToHex(A.r + (B.r - A.r) * t, A.g + (B.g - A.g) * t, A.b + (B.b - A.b) * t);
+}
+function lighten(hex, amount) {
+  const { r, g, b } = hexToRgb(hex);
+  const { h, s, l } = rgbToHsl(r, g, b);
+  const next = hslToRgb(h, s, Math.min(100, l + amount * 100));
+  return rgbToHex(next.r, next.g, next.b);
+}
+function darken(hex, amount) {
+  const { r, g, b } = hexToRgb(hex);
+  const { h, s, l } = rgbToHsl(r, g, b);
+  const next = hslToRgb(h, s, Math.max(0, l - amount * 100));
+  return rgbToHex(next.r, next.g, next.b);
+}
+function isDark(hex) {
+  const { r, g, b } = hexToRgb(hex);
+  return (0.299 * r + 0.587 * g + 0.114 * b) < 128;
+}
+function readableOn(bg, light = "#ffffff", dark = "#0e1020") {
+  return isDark(bg) ? light : dark;
+}
+
+// WCAG-style relative luminance (0..1)
+function luminance(hex) {
+  const { r, g, b } = hexToRgb(hex);
+  const norm = (v) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * norm(r) + 0.7152 * norm(g) + 0.0722 * norm(b);
+}
+function contrast(a, b) {
+  const la = luminance(a), lb = luminance(b);
+  const [hi, lo] = la > lb ? [la, lb] : [lb, la];
+  return (hi + 0.05) / (lo + 0.05);
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+function slug(s) {
+  return String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+// Build SVG-data-URI gradient placeholder for hero & feed thumbs.
+function gradientImage(colorA, colorB, width = 1200, height = 800, label = "") {
+  const A = hexToRgb(colorA), B = hexToRgb(colorB);
+  const noise = `
+    <filter id="n"><feTurbulence baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .12 0"/></filter>
+  `;
+  const txt = label
+    ? `<text x="50%" y="86%" text-anchor="middle" font-family="Inter, sans-serif" font-size="38" font-weight="700" fill="rgba(255,255,255,.92)" letter-spacing="0.04em">${label}</text>`
+    : "";
+  const svg = `
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}">
+    <defs>
+      <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+        <stop offset="0" stop-color="${colorA}"/>
+        <stop offset="1" stop-color="${colorB}"/>
+      </linearGradient>
+      ${noise}
+    </defs>
+    <rect width="${width}" height="${height}" fill="url(#g)"/>
+    <circle cx="${width * 0.78}" cy="${height * 0.22}" r="${height * 0.32}" fill="rgba(${B.r},${B.g},${B.b},.35)"/>
+    <circle cx="${width * 0.18}" cy="${height * 0.78}" r="${height * 0.4}" fill="rgba(${A.r},${A.g},${A.b},.45)"/>
+    <rect width="${width}" height="${height}" filter="url(#n)" opacity=".55"/>
+    ${txt}
+  </svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+
+// ---------- src/css.js ----------
+// Generates a portable brand-kit CSS file from the wizard state.
+const RADIUS_MAP = {
+  sharp:   { sm: "0px",  md: "0px",  lg: "0px",  pill: "0px"  },
+  soft:    { sm: "4px",  md: "6px",  lg: "10px", pill: "999px" },
+  rounded: { sm: "8px",  md: "14px", lg: "22px", pill: "999px" },
+  pill:    { sm: "16px", md: "24px", lg: "36px", pill: "999px" }
+};
+
+const DENSITY_MAP = {
+  compact:     { ratio: 0.85, line: 1.5  },
+  comfortable: { ratio: 1.0,  line: 1.65 },
+  spacious:    { ratio: 1.2,  line: 1.75 }
+};
+
+const SPACING_BASE = [4, 8, 12, 16, 20, 24, 32, 40, 56, 72]; // px
+function generateBrandCss(brand, publisher) {
+  const { colors: c, typography: t, tokens: tk } = brand;
+  const radii = RADIUS_MAP[tk.radius] || RADIUS_MAP.rounded;
+  const density = DENSITY_MAP[tk.density] || DENSITY_MAP.comfortable;
+  const dark = tk.mood === "dark";
+
+  // Derive surface & ink defaults if user picked a non-traditional combo.
+  const surface = c.surface;
+  const ink = c.ink;
+  const muted = mix(ink, surface, 0.4);
+  const subtle = mix(ink, surface, 0.85);
+  const line   = mix(ink, surface, 0.88);
+  const lineStrong = mix(ink, surface, 0.78);
+
+  const onPrimary = readableOn(c.primary);
+  const onAccent = readableOn(c.accent);
+  const primarySoft = mix(c.primary, surface, 0.85);
+  const accentSoft = mix(c.accent, surface, 0.88);
+
+  const heading = `'${t.heading}', ${t.headingFallback}`;
+  const body = `'${t.body}', ${t.bodyFallback}`;
+
+  const space = SPACING_BASE.map((v) => `${(v * density.ratio).toFixed(2)}px`);
+
+  const dark_ = dark
+    ? `\n.bk-theme-dark { color-scheme: dark; }\n`
+    : "";
+
+  return `/*
+ * Brand Kit — ${publisher.name || publisher.domain}
+ * Generated by Brand Kit Studio
+ * Source: ${publisher.url}
+ *
+ * Drop this file into your publisher template and apply the .bk-theme class
+ * to the root container (or <body>) to opt into the brand kit.
+ */
+
+@import url("https://fonts.googleapis.com/css2?family=${encodeURIComponent(t.heading).replace(/%20/g, "+")}:wght@600;700;800&family=${encodeURIComponent(t.body).replace(/%20/g, "+")}:wght@400;500;600;700&display=swap");
+
+.bk-theme {
+  /* ---------- Color tokens ---------- */
+  --bk-color-primary: ${c.primary};
+  --bk-color-primary-soft: ${primarySoft};
+  --bk-color-primary-strong: ${darken(c.primary, 0.08)};
+  --bk-color-on-primary: ${onPrimary};
+
+  --bk-color-accent: ${c.accent};
+  --bk-color-accent-soft: ${accentSoft};
+  --bk-color-on-accent: ${onAccent};
+
+  --bk-color-ink: ${ink};
+  --bk-color-ink-muted: ${muted};
+  --bk-color-ink-subtle: ${mix(ink, surface, 0.55)};
+
+  --bk-color-surface: ${surface};
+  --bk-color-surface-1: ${dark ? lighten(surface, 0.04) : darken(surface, 0.02)};
+  --bk-color-surface-2: ${dark ? lighten(surface, 0.08) : darken(surface, 0.05)};
+
+  --bk-color-line: ${line};
+  --bk-color-line-strong: ${lineStrong};
+  --bk-color-success: #1d9d6a;
+  --bk-color-danger: #c64d4d;
+
+  /* ---------- Typography ---------- */
+  --bk-font-heading: ${heading};
+  --bk-font-body: ${body};
+  --bk-font-size-xs: 12px;
+  --bk-font-size-sm: 14px;
+  --bk-font-size-base: 16px;
+  --bk-font-size-lg: 18px;
+  --bk-font-size-xl: 22px;
+  --bk-font-size-2xl: 28px;
+  --bk-font-size-3xl: 36px;
+  --bk-font-size-4xl: 48px;
+  --bk-font-size-display: clamp(40px, 6vw, 72px);
+  --bk-line-tight: 1.1;
+  --bk-line-body: ${density.line};
+
+  /* ---------- Radius ---------- */
+  --bk-radius-sm: ${radii.sm};
+  --bk-radius-md: ${radii.md};
+  --bk-radius-lg: ${radii.lg};
+  --bk-radius-pill: ${radii.pill};
+
+  /* ---------- Spacing ---------- */
+  --bk-space-1: ${space[0]};
+  --bk-space-2: ${space[1]};
+  --bk-space-3: ${space[2]};
+  --bk-space-4: ${space[3]};
+  --bk-space-5: ${space[4]};
+  --bk-space-6: ${space[5]};
+  --bk-space-7: ${space[6]};
+  --bk-space-8: ${space[7]};
+  --bk-space-9: ${space[8]};
+  --bk-space-10: ${space[9]};
+
+  /* ---------- Shadows ---------- */
+  --bk-shadow-sm: 0 1px 2px rgba(0,0,0,.06), 0 1px 1px rgba(0,0,0,.04);
+  --bk-shadow-md: 0 8px 24px -10px rgba(0,0,0,.18), 0 2px 6px rgba(0,0,0,.06);
+  --bk-shadow-lg: 0 30px 60px -24px rgba(0,0,0,.28);
+
+  /* ---------- Layout ---------- */
+  --bk-content-width: 720px;
+  --bk-page-width: 1200px;
+}
+${dark_}
+/* ---------- Base ---------- */
+.bk-theme {
+  background: var(--bk-color-surface);
+  color: var(--bk-color-ink);
+  font-family: var(--bk-font-body);
+  font-size: var(--bk-font-size-base);
+  line-height: var(--bk-line-body);
+  -webkit-font-smoothing: antialiased;
+}
+.bk-theme *,
+.bk-theme *::before,
+.bk-theme *::after { box-sizing: border-box; }
+
+.bk-theme h1, .bk-theme h2, .bk-theme h3, .bk-theme h4 {
+  font-family: var(--bk-font-heading);
+  line-height: var(--bk-line-tight);
+  letter-spacing: -0.02em;
+  margin: 0;
+  color: var(--bk-color-ink);
+}
+.bk-theme p { margin: 0 0 var(--bk-space-4); }
+.bk-theme a { color: var(--bk-color-primary-strong); text-underline-offset: 3px; }
+.bk-theme a:hover { text-decoration-thickness: 2px; }
+
+/* ---------- Header ---------- */
+.bk-header {
+  position: sticky; top: 0; z-index: 50;
+  background: color-mix(in srgb, var(--bk-color-surface) 92%, transparent);
+  backdrop-filter: saturate(160%) blur(12px);
+  border-bottom: 1px solid var(--bk-color-line);
+}
+.bk-header__inner {
+  max-width: var(--bk-page-width);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--bk-space-6);
+  padding: var(--bk-space-4) var(--bk-space-6);
+}
+.bk-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--bk-space-3);
+  font-family: var(--bk-font-heading);
+  font-weight: 800;
+  font-size: var(--bk-font-size-xl);
+  letter-spacing: -0.01em;
+  color: var(--bk-color-ink);
+  text-decoration: none;
+}
+.bk-logo__mark {
+  display: inline-grid;
+  place-items: center;
+  width: 36px; height: 36px;
+  border-radius: var(--bk-radius-md);
+  background: linear-gradient(135deg, var(--bk-color-primary), var(--bk-color-accent));
+  color: var(--bk-color-on-primary);
+  font-weight: 800;
+  font-family: var(--bk-font-heading);
+}
+.bk-nav { display: flex; gap: var(--bk-space-5); flex: 1; }
+.bk-nav a {
+  font-size: var(--bk-font-size-sm);
+  font-weight: 600;
+  color: var(--bk-color-ink-muted);
+  text-decoration: none;
+  padding: var(--bk-space-2) 0;
+  border-bottom: 2px solid transparent;
+  transition: color .15s ease, border-color .15s ease;
+}
+.bk-nav a:hover { color: var(--bk-color-ink); border-bottom-color: var(--bk-color-primary); }
+.bk-header__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--bk-space-3);
+}
+.bk-btn {
+  display: inline-flex; align-items: center; gap: var(--bk-space-2);
+  padding: 10px 16px;
+  border-radius: var(--bk-radius-md);
+  font-weight: 600;
+  font-size: var(--bk-font-size-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform .15s ease, background .2s ease, box-shadow .2s ease, color .2s ease;
+}
+.bk-btn--primary {
+  background: var(--bk-color-primary);
+  color: var(--bk-color-on-primary);
+  box-shadow: 0 4px 14px -4px color-mix(in srgb, var(--bk-color-primary) 60%, transparent);
+}
+.bk-btn--primary:hover { background: var(--bk-color-primary-strong); }
+.bk-btn--ghost {
+  background: transparent;
+  color: var(--bk-color-ink);
+  border-color: var(--bk-color-line-strong);
+}
+.bk-btn--ghost:hover { background: var(--bk-color-surface-1); }
+
+/* ---------- Article hero ---------- */
+.bk-article {
+  max-width: var(--bk-page-width);
+  margin: 0 auto;
+  padding: var(--bk-space-8) var(--bk-space-6);
+}
+.bk-article__breadcrumbs {
+  display: flex;
+  gap: var(--bk-space-2);
+  align-items: center;
+  font-size: var(--bk-font-size-xs);
+  color: var(--bk-color-ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: var(--bk-space-4);
+}
+.bk-tag {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: var(--bk-radius-pill);
+  background: var(--bk-color-primary);
+  color: var(--bk-color-on-primary);
+  font-size: var(--bk-font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.bk-tag--accent { background: var(--bk-color-accent); color: var(--bk-color-on-accent); }
+.bk-tag--soft   { background: var(--bk-color-primary-soft); color: var(--bk-color-primary-strong); }
+
+.bk-article__title {
+  font-size: var(--bk-font-size-display);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  margin: var(--bk-space-3) 0 var(--bk-space-4);
+  max-width: 22ch;
+}
+.bk-article__deck {
+  font-size: var(--bk-font-size-xl);
+  line-height: 1.45;
+  color: var(--bk-color-ink-muted);
+  max-width: var(--bk-content-width);
+  margin: 0 0 var(--bk-space-6);
+}
+.bk-article__byline {
+  display: flex;
+  align-items: center;
+  gap: var(--bk-space-4);
+  font-size: var(--bk-font-size-sm);
+  color: var(--bk-color-ink-muted);
+  margin-bottom: var(--bk-space-6);
+  flex-wrap: wrap;
+}
+.bk-avatar {
+  width: 40px; height: 40px;
+  border-radius: var(--bk-radius-pill);
+  background: linear-gradient(135deg, var(--bk-color-primary), var(--bk-color-accent));
+  display: inline-grid; place-items: center;
+  color: var(--bk-color-on-primary);
+  font-weight: 700;
+  font-family: var(--bk-font-heading);
+}
+.bk-byline__name { color: var(--bk-color-ink); font-weight: 600; }
+
+.bk-hero {
+  position: relative;
+  border-radius: var(--bk-radius-lg);
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  margin-bottom: var(--bk-space-7);
+  background: linear-gradient(135deg, var(--bk-color-primary), var(--bk-color-accent));
+}
+.bk-hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.bk-hero__caption {
+  position: absolute; left: var(--bk-space-5); bottom: var(--bk-space-4);
+  font-size: var(--bk-font-size-xs);
+  color: rgba(255,255,255,.92);
+  background: rgba(0,0,0,.45);
+  padding: 6px 10px;
+  border-radius: var(--bk-radius-sm);
+  backdrop-filter: blur(6px);
+}
+
+/* ---------- Article body ---------- */
+.bk-prose {
+  max-width: var(--bk-content-width);
+  margin: 0 auto;
+  font-size: var(--bk-font-size-lg);
+  line-height: var(--bk-line-body);
+}
+.bk-prose p { margin: 0 0 var(--bk-space-5); }
+.bk-prose h2 {
+  font-size: var(--bk-font-size-2xl);
+  margin: var(--bk-space-7) 0 var(--bk-space-4);
+}
+.bk-prose blockquote {
+  margin: var(--bk-space-7) 0;
+  padding: var(--bk-space-2) 0 var(--bk-space-2) var(--bk-space-5);
+  border-left: 4px solid var(--bk-color-primary);
+  font-family: var(--bk-font-heading);
+  font-size: var(--bk-font-size-2xl);
+  line-height: 1.3;
+  color: var(--bk-color-ink);
+  font-style: italic;
+}
+.bk-prose blockquote cite {
+  display: block;
+  font-family: var(--bk-font-body);
+  font-style: normal;
+  font-weight: 600;
+  font-size: var(--bk-font-size-sm);
+  color: var(--bk-color-ink-muted);
+  margin-top: var(--bk-space-2);
+}
+.bk-prose figure { margin: var(--bk-space-6) 0; }
+.bk-prose figure img {
+  width: 100%;
+  border-radius: var(--bk-radius-lg);
+  display: block;
+}
+.bk-prose figcaption {
+  font-size: var(--bk-font-size-sm);
+  color: var(--bk-color-ink-muted);
+  margin-top: var(--bk-space-2);
+}
+.bk-prose a { color: var(--bk-color-primary-strong); font-weight: 500; }
+
+.bk-pull {
+  margin: var(--bk-space-7) auto;
+  padding: var(--bk-space-6);
+  background: var(--bk-color-primary-soft);
+  border-left: 6px solid var(--bk-color-primary);
+  border-radius: var(--bk-radius-md);
+  max-width: var(--bk-content-width);
+}
+.bk-pull p {
+  font-family: var(--bk-font-heading);
+  font-size: var(--bk-font-size-2xl);
+  line-height: 1.25;
+  color: var(--bk-color-ink);
+  margin: 0;
+}
+
+/* ---------- New feed experience ---------- */
+.bk-feed {
+  background: var(--bk-color-surface-1);
+  border-top: 1px solid var(--bk-color-line);
+  padding: var(--bk-space-9) var(--bk-space-6);
+  margin-top: var(--bk-space-9);
+}
+.bk-feed__inner {
+  max-width: var(--bk-page-width);
+  margin: 0 auto;
+}
+.bk-feed__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--bk-space-5);
+  margin-bottom: var(--bk-space-6);
+  flex-wrap: wrap;
+}
+.bk-feed__title {
+  font-size: var(--bk-font-size-3xl);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.bk-feed__sub {
+  color: var(--bk-color-ink-muted);
+  margin-top: var(--bk-space-2);
+  font-size: var(--bk-font-size-base);
+}
+.bk-feed__filters {
+  display: flex; gap: var(--bk-space-2); flex-wrap: wrap;
+}
+.bk-filter {
+  padding: 8px 14px;
+  border-radius: var(--bk-radius-pill);
+  background: transparent;
+  border: 1px solid var(--bk-color-line-strong);
+  color: var(--bk-color-ink-muted);
+  font-size: var(--bk-font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.bk-filter:hover { color: var(--bk-color-ink); border-color: var(--bk-color-primary); }
+.bk-filter[aria-pressed="true"] {
+  background: var(--bk-color-primary);
+  border-color: var(--bk-color-primary);
+  color: var(--bk-color-on-primary);
+}
+
+.bk-feed__grid {
+  display: grid;
+  gap: var(--bk-space-6);
+  grid-template-columns: 2fr 1fr 1fr;
+  grid-template-rows: auto auto;
+  grid-template-areas:
+    "lead side1 side2"
+    "lead side3 side4"
+    "card1 card2 card3";
+}
+@media (max-width: 980px) {
+  .bk-feed__grid {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "lead lead"
+      "side1 side2"
+      "side3 side4"
+      "card1 card2"
+      "card3 card3";
+  }
+}
+@media (max-width: 640px) {
+  .bk-feed__grid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "lead"
+      "side1"
+      "side2"
+      "side3"
+      "side4"
+      "card1"
+      "card2"
+      "card3";
+  }
+}
+.bk-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--bk-color-surface);
+  border: 1px solid var(--bk-color-line);
+  border-radius: var(--bk-radius-lg);
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  transition: transform .25s ease, box-shadow .25s ease, border-color .2s ease;
+}
+.bk-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--bk-color-primary-soft);
+  box-shadow: var(--bk-shadow-md);
+}
+.bk-card__media {
+  aspect-ratio: 16 / 10;
+  background: linear-gradient(135deg, var(--bk-color-primary), var(--bk-color-accent));
+  position: relative;
+}
+.bk-card__media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.bk-card__category {
+  position: absolute;
+  left: var(--bk-space-3);
+  top: var(--bk-space-3);
+  background: var(--bk-color-surface);
+  color: var(--bk-color-primary-strong);
+  font-size: var(--bk-font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 4px 10px;
+  border-radius: var(--bk-radius-pill);
+}
+.bk-card__body { padding: var(--bk-space-5); display: flex; flex-direction: column; gap: var(--bk-space-2); flex: 1; }
+.bk-card__title {
+  font-family: var(--bk-font-heading);
+  font-size: var(--bk-font-size-xl);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--bk-color-ink);
+}
+.bk-card__deck {
+  color: var(--bk-color-ink-muted);
+  font-size: var(--bk-font-size-sm);
+  line-height: 1.5;
+}
+.bk-card__meta {
+  margin-top: auto;
+  font-size: var(--bk-font-size-xs);
+  color: var(--bk-color-ink-muted);
+  display: flex;
+  gap: var(--bk-space-3);
+  align-items: center;
+}
+.bk-card--lead { grid-area: lead; }
+.bk-card--lead .bk-card__media { aspect-ratio: 16 / 11; }
+.bk-card--lead .bk-card__title { font-size: var(--bk-font-size-3xl); }
+.bk-card--lead .bk-card__deck { font-size: var(--bk-font-size-base); }
+
+.bk-card--row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+}
+.bk-card--row .bk-card__media { aspect-ratio: 1 / 1; }
+.bk-card--row .bk-card__title { font-size: var(--bk-font-size-base); }
+.bk-card--row .bk-card__body { padding: var(--bk-space-3) var(--bk-space-4); gap: var(--bk-space-1); }
+.bk-card--row .bk-card__category { display: none; }
+.bk-card--row .bk-card__deck { display: none; }
+
+/* ---------- Newsletter strip ---------- */
+.bk-newsletter {
+  background: var(--bk-color-ink);
+  color: var(--bk-color-surface);
+  padding: var(--bk-space-9) var(--bk-space-6);
+  text-align: center;
+}
+.bk-newsletter__inner {
+  max-width: 640px;
+  margin: 0 auto;
+}
+.bk-newsletter h2 {
+  color: var(--bk-color-surface);
+  font-size: var(--bk-font-size-3xl);
+  margin-bottom: var(--bk-space-3);
+}
+.bk-newsletter p { color: color-mix(in srgb, var(--bk-color-surface) 70%, transparent); margin-bottom: var(--bk-space-5); }
+.bk-newsletter form {
+  display: flex; gap: var(--bk-space-3);
+  max-width: 480px; margin: 0 auto;
+}
+.bk-newsletter input {
+  flex: 1;
+  padding: 12px 16px;
+  border-radius: var(--bk-radius-md);
+  border: 1px solid color-mix(in srgb, var(--bk-color-surface) 25%, transparent);
+  background: color-mix(in srgb, var(--bk-color-surface) 8%, transparent);
+  color: var(--bk-color-surface);
+  font: inherit;
+}
+.bk-newsletter input::placeholder { color: color-mix(in srgb, var(--bk-color-surface) 50%, transparent); }
+.bk-newsletter input:focus { outline: 2px solid var(--bk-color-accent); outline-offset: 1px; }
+.bk-newsletter .bk-btn--primary { background: var(--bk-color-accent); color: var(--bk-color-on-accent); }
+
+/* ---------- Footer ---------- */
+.bk-footer {
+  padding: var(--bk-space-7) var(--bk-space-6) var(--bk-space-6);
+  background: var(--bk-color-surface);
+  border-top: 1px solid var(--bk-color-line);
+  font-size: var(--bk-font-size-sm);
+  color: var(--bk-color-ink-muted);
+}
+.bk-footer__inner {
+  max-width: var(--bk-page-width);
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--bk-space-5);
+}
+.bk-footer a { color: var(--bk-color-ink-muted); text-decoration: none; margin-right: var(--bk-space-4); }
+.bk-footer a:hover { color: var(--bk-color-ink); }
+
+/* ---------- Reading progress ---------- */
+.bk-progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 3px;
+  background: transparent;
+  z-index: 60;
+}
+.bk-progress__bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--bk-color-primary), var(--bk-color-accent));
+  transition: width .1s linear;
+}
+`;
+}
+
+
+// ---------- src/prototype.js ----------
+// Generates a self-contained HTML article page with the new feed experience,
+// styled by the brand-kit CSS that the wizard generated.
+const FEED_ITEMS = [
+  {
+    category: "Politics",
+    title: "Inside the policy meeting that quietly redrew the legislative agenda",
+    deck: "Six staffers. Two whiteboards. One memo nobody outside the room has seen — until now.",
+    author: "Maya Okonkwo",
+    minutes: 8,
+    layout: "lead"
+  },
+  { category: "Business",  title: "Why the next wave of layoffs is targeting middle managers",            author: "Daniel Park",      minutes: 6, layout: "side" },
+  { category: "Tech",      title: "An AI assistant that finally feels like a coworker, not a chatbot",     author: "Lina Reyes",       minutes: 5, layout: "side" },
+  { category: "Culture",   title: "The quiet return of the print magazine",                              author: "Jordan Hayes",     minutes: 4, layout: "side" },
+  { category: "Climate",   title: "How a tiny port city became the model for grid-scale storage",        author: "Aisha Ahmed",      minutes: 7, layout: "side" },
+  { category: "Opinion",   title: "We're measuring news engagement wrong. Here's the fix.",              deck: "A slower scroll, a longer dwell, a richer signal.", author: "T. Adekunle",      minutes: 6, layout: "card" },
+  { category: "Science",   title: "Researchers reconstruct a lost Roman road using satellite shadows",   deck: "Half a millennium of farmland yielded a near-perfect grid.",                       author: "M. Karlsson",      minutes: 5, layout: "card" },
+  { category: "Sports",    title: "The training data that's quietly reshaping the back office",          deck: "Recovery scores, biomechanics, sleep — and a new front-office discipline.",         author: "Ravi Sundar",      minutes: 6, layout: "card" }
+];
+function renderArticleHtml(brand, publisher, brandCss) {
+  const name = escapeHtml(publisher.name || publisher.domain || "The Daily Edition");
+  const monogram = escapeHtml((publisher.name || "B").charAt(0).toUpperCase());
+  const c = brand.colors;
+
+  const heroImg = gradientImage(c.primary, c.accent, 1600, 900);
+  const inlineImg = gradientImage(c.accent, mix(c.primary, c.accent, 0.5), 1200, 800);
+
+  const feedHtml = FEED_ITEMS.map((item, i) => {
+    const img = gradientImage(
+      mix(c.primary, c.accent, (i % 3) / 3),
+      mix(c.accent, c.primary, ((i + 1) % 4) / 4),
+      900, 600
+    );
+    if (item.layout === "lead") {
+      return `
+        <a class="bk-card bk-card--lead" href="#" aria-label="${escapeHtml(item.title)}">
+          <div class="bk-card__media">
+            <img src="${img}" alt="" />
+            <span class="bk-card__category">${escapeHtml(item.category)}</span>
+          </div>
+          <div class="bk-card__body">
+            <h3 class="bk-card__title">${escapeHtml(item.title)}</h3>
+            <p class="bk-card__deck">${escapeHtml(item.deck || "")}</p>
+            <div class="bk-card__meta">
+              <span>By ${escapeHtml(item.author)}</span>
+              <span aria-hidden="true">·</span>
+              <span>${item.minutes} min read</span>
+            </div>
+          </div>
+        </a>`;
+    }
+    if (item.layout === "side") {
+      const area = `side${(i)}`; // side1..side4
+      return `
+        <a class="bk-card bk-card--row" style="grid-area: ${area}" href="#">
+          <div class="bk-card__media">
+            <img src="${img}" alt="" />
+          </div>
+          <div class="bk-card__body">
+            <span class="bk-tag bk-tag--soft" style="align-self:flex-start;font-size:10px;padding:2px 8px;">${escapeHtml(item.category)}</span>
+            <h3 class="bk-card__title">${escapeHtml(item.title)}</h3>
+            <div class="bk-card__meta">
+              <span>${escapeHtml(item.author)}</span>
+              <span aria-hidden="true">·</span>
+              <span>${item.minutes} min</span>
+            </div>
+          </div>
+        </a>`;
+    }
+    // card
+    const area = `card${i - 4}`; // card1..card3 for indexes 5,6,7
+    return `
+      <a class="bk-card" style="grid-area: ${area}" href="#">
+        <div class="bk-card__media">
+          <img src="${img}" alt="" />
+          <span class="bk-card__category">${escapeHtml(item.category)}</span>
+        </div>
+        <div class="bk-card__body">
+          <h3 class="bk-card__title">${escapeHtml(item.title)}</h3>
+          <p class="bk-card__deck">${escapeHtml(item.deck || "")}</p>
+          <div class="bk-card__meta">
+            <span>By ${escapeHtml(item.author)}</span>
+            <span aria-hidden="true">·</span>
+            <span>${item.minutes} min read</span>
+          </div>
+        </div>
+      </a>`;
+  }).join("");
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${name} · A new feed experience</title>
+<style>${brandCss}</style>
+</head>
+<body class="bk-theme">
+  <div class="bk-progress" aria-hidden="true"><div class="bk-progress__bar" id="bk-progress"></div></div>
+
+  <header class="bk-header">
+    <div class="bk-header__inner">
+      <a class="bk-logo" href="#">
+        <span class="bk-logo__mark">${monogram}</span>
+        <span>${name}</span>
+      </a>
+      <nav class="bk-nav" aria-label="Sections">
+        <a href="#">News</a>
+        <a href="#">Politics</a>
+        <a href="#">Business</a>
+        <a href="#">Tech</a>
+        <a href="#">Culture</a>
+        <a href="#">Opinion</a>
+      </nav>
+      <div class="bk-header__cta">
+        <a class="bk-btn bk-btn--ghost" href="#">Sign in</a>
+        <a class="bk-btn bk-btn--primary" href="#">Subscribe</a>
+      </div>
+    </div>
+  </header>
+
+  <article class="bk-article">
+    <div class="bk-article__breadcrumbs">
+      <span>News</span><span aria-hidden="true">›</span><span>Politics</span><span aria-hidden="true">›</span><span>Investigation</span>
+    </div>
+    <span class="bk-tag">Investigation</span>
+    <h1 class="bk-article__title">A new feed experience that quietly changed how readers stay informed.</h1>
+    <p class="bk-article__deck">
+      Inside ${name}'s redesigned reading experience: how a fresh palette, a more
+      generous grid, and a smarter recommendation engine added 38% to dwell time without
+      adding a single new article.
+    </p>
+    <div class="bk-article__byline">
+      <span class="bk-avatar">M</span>
+      <span><span class="bk-byline__name">Maya Okonkwo</span> · Senior correspondent</span>
+      <span aria-hidden="true">·</span>
+      <span>Updated 2 hours ago</span>
+      <span aria-hidden="true">·</span>
+      <span>8 min read</span>
+    </div>
+
+    <figure class="bk-hero">
+      <img src="${heroImg}" alt="" />
+      <figcaption class="bk-hero__caption">${name} editorial · Photo illustration</figcaption>
+    </figure>
+
+    <div class="bk-prose">
+      <p>
+        For most of the last decade, the front page was a battle for attention.
+        Headlines competed for eyeballs, and the feed below them — the seemingly
+        endless tail of related stories — was an afterthought, dressed up with
+        whatever theme the engineering team had time for.
+      </p>
+      <p>
+        That changed last spring, when a small team at <strong>${name}</strong> set out to
+        rebuild the feed from the ground up. Not as a recommendation engine, and not
+        as a styling exercise, but as a single coherent experience: brand, content,
+        and signal in one frame.
+      </p>
+
+      <blockquote>
+        We stopped thinking about the feed as a list of links and started thinking
+        about it as the publication's voice in motion.
+        <cite>— Editor-in-chief, ${name}</cite>
+      </blockquote>
+
+      <h2>What the redesign actually changes</h2>
+      <p>
+        Three things, mostly. A typographic system that earns the headline. A grid
+        that respects the reader's eye. And a palette that makes every section feel
+        unmistakably like it belongs to ${name}.
+      </p>
+
+      <div class="bk-pull">
+        <p>The feed isn't where readers go after the article. It's where they decide what ${name} is.</p>
+      </div>
+
+      <p>
+        It's a small idea, dressed up in a lot of careful design work. The result
+        is a page that feels considered without feeling precious — and a kit any
+        publisher can adopt without re-platforming.
+      </p>
+
+      <figure>
+        <img src="${inlineImg}" alt="" />
+        <figcaption>The new section grid groups stories by intent, not by recency.</figcaption>
+      </figure>
+
+      <h2>Why it works</h2>
+      <p>
+        Brand kits like this one establish the rules once — color, type, radius,
+        rhythm — and let every downstream component inherit them. That's what the
+        wizard you just used did: it sampled ${name}'s real palette, paired it
+        with a typography system, and generated a single CSS file you can drop
+        anywhere.
+      </p>
+      <p>
+        The result, scrolling below this article, is a feed that finally feels like
+        the publication it lives inside.
+      </p>
+    </div>
+  </article>
+
+  <section class="bk-feed" aria-label="More from ${name}">
+    <div class="bk-feed__inner">
+      <header class="bk-feed__head">
+        <div>
+          <h2 class="bk-feed__title">More from ${name}</h2>
+          <p class="bk-feed__sub">A new feed experience, tuned to your last read.</p>
+        </div>
+        <div class="bk-feed__filters" role="tablist" aria-label="Filter feed">
+          <button class="bk-filter" aria-pressed="true">For you</button>
+          <button class="bk-filter" aria-pressed="false">Latest</button>
+          <button class="bk-filter" aria-pressed="false">Most read</button>
+          <button class="bk-filter" aria-pressed="false">Editor's picks</button>
+        </div>
+      </header>
+      <div class="bk-feed__grid">
+        ${feedHtml}
+      </div>
+    </div>
+  </section>
+
+  <section class="bk-newsletter">
+    <div class="bk-newsletter__inner">
+      <h2>The ${name} brief, in your inbox.</h2>
+      <p>One short email. Five stories worth your morning. No filler.</p>
+      <form onsubmit="event.preventDefault(); this.querySelector('button').textContent='Subscribed'; ">
+        <input type="email" placeholder="you@domain.com" required />
+        <button type="submit" class="bk-btn bk-btn--primary">Subscribe</button>
+      </form>
+    </div>
+  </section>
+
+  <footer class="bk-footer">
+    <div class="bk-footer__inner">
+      <div>© ${new Date().getFullYear()} ${name}. All rights reserved.</div>
+      <nav aria-label="Footer">
+        <a href="#">About</a>
+        <a href="#">Careers</a>
+        <a href="#">Advertise</a>
+        <a href="#">Privacy</a>
+        <a href="#">Terms</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script>
+    // Reading progress bar
+    (function () {
+      var bar = document.getElementById("bk-progress");
+      if (!bar) return;
+      var update = function () {
+        var h = document.documentElement;
+        var pct = (h.scrollTop) / (h.scrollHeight - h.clientHeight) * 100;
+        bar.style.width = Math.max(0, Math.min(100, pct)) + "%";
+      };
+      window.addEventListener("scroll", update, { passive: true });
+      update();
+    })();
+    // Filter toggle (visual only)
+    document.querySelectorAll(".bk-filter").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        document.querySelectorAll(".bk-filter").forEach(function (b) { b.setAttribute("aria-pressed", "false"); });
+        btn.setAttribute("aria-pressed", "true");
+      });
+    });
+  </script>
+</body>
+</html>`;
+}
+
+
+// ---------- app.js ----------
+// Brand Kit Studio — wizard, brand detection, CSS generation, article prototype
+// ---------- Wizard step config ----------
+const STEPS = [
+  { id: "welcome",    tpl: "tpl-welcome",    label: "Welcome",       hideInStepper: true,  next: "Get started" },
+  { id: "url",        tpl: "tpl-url",        label: "Source",        next: "Analyze" },
+  { id: "analyzing",  tpl: "tpl-analyzing",  label: "Analyze",       hideNav: true },
+  { id: "brand",      tpl: "tpl-brand",      label: "Brand",         next: "Continue" },
+  { id: "typography", tpl: "tpl-typography", label: "Typography",    next: "Continue" },
+  { id: "tokens",     tpl: "tpl-tokens",     label: "Tokens",        next: "Generate" },
+  { id: "generating", tpl: "tpl-generating", label: "Build",         hideNav: true },
+  { id: "preview",    tpl: "tpl-preview",    label: "Preview",       next: "Start over", terminal: true }
+];
+
+// ---------- State ----------
+const state = {
+  stepIndex: 0,
+  publisher: { url: "", domain: "", name: "" },
+  brand: {
+    logoUrl: "",
+    monogram: "",
+    colors: {
+      primary:    "#7c5cff",
+      accent:     "#22d3ee",
+      surface:    "#ffffff",
+      ink:        "#0e1020",
+      muted:      "#6f7396"
+    },
+    typography: {
+      pairId: "modern-serif",
+      heading: "Playfair Display",
+      headingFallback: "serif",
+      body:    "Inter",
+      bodyFallback: "sans-serif"
+    },
+    tokens: {
+      radius: "rounded", // sharp | soft | rounded | pill
+      density: "comfortable", // compact | comfortable | spacious
+      mood: "light" // light | dark
+    }
+  },
+  generated: { css: "", html: "" }
+};
+
+// ---------- Type pairings ----------
+const TYPE_PAIRS = [
+  { id: "modern-serif",   name: "Modern Serif",       heading: "Playfair Display", headingFb: "serif",     body: "Inter",          bodyFb: "sans-serif" },
+  { id: "editorial",      name: "Editorial",          heading: "Fraunces",         headingFb: "serif",     body: "Source Serif 4", bodyFb: "serif" },
+  { id: "magazine",       name: "Magazine",           heading: "DM Serif Display", headingFb: "serif",     body: "Inter",          bodyFb: "sans-serif" },
+  { id: "newsroom",       name: "Newsroom",           heading: "Merriweather",     headingFb: "serif",     body: "Lora",           bodyFb: "serif" },
+  { id: "tech-mag",       name: "Tech Magazine",      heading: "Space Grotesk",    headingFb: "sans-serif",body: "Inter",          bodyFb: "sans-serif" },
+  { id: "humanist",       name: "Humanist",           heading: "Manrope",          headingFb: "sans-serif",body: "Manrope",        bodyFb: "sans-serif" },
+  { id: "ibm",            name: "Plex Editorial",     heading: "IBM Plex Sans",    headingFb: "sans-serif",body: "IBM Plex Sans",  bodyFb: "sans-serif" },
+  { id: "workhorse",      name: "Workhorse",          heading: "Work Sans",        headingFb: "sans-serif",body: "Work Sans",      bodyFb: "sans-serif" }
+];
+
+// ---------- Element refs ----------
+const $wizard = document.getElementById("wizard");
+const $stepper = document.getElementById("stepper");
+const $stepCounter = document.getElementById("step-counter");
+const $progressBar = document.getElementById("progress-bar");
+const $btnBack = document.getElementById("btn-back");
+const $btnNext = document.getElementById("btn-next");
+const $btnNextLabel = document.getElementById("btn-next-label");
+const $toast = document.getElementById("toast");
+
+// ---------- Stepper render ----------
+function renderStepper() {
+  $stepper.innerHTML = "";
+  let visibleIndex = 0;
+  STEPS.forEach((step, i) => {
+    if (step.hideInStepper) return;
+    visibleIndex += 1;
+    const li = document.createElement("li");
+    li.className = "stepper__item";
+    if (i === state.stepIndex) li.classList.add("is-active");
+    if (i < state.stepIndex) li.classList.add("is-done");
+    li.innerHTML = `<span class="num">${visibleIndex}</span><span>${step.label}</span>`;
+    $stepper.appendChild(li);
+  });
+  // step counter + progress
+  const visibleSteps = STEPS.filter((s) => !s.hideInStepper);
+  const visibleCurrent = visibleSteps.findIndex((s) => s.id === STEPS[state.stepIndex].id) + 1;
+  if (visibleCurrent > 0) {
+    $stepCounter.textContent = `Step ${visibleCurrent} of ${visibleSteps.length}`;
+  } else {
+    $stepCounter.textContent = "Welcome";
+  }
+  const progress = (state.stepIndex / (STEPS.length - 1)) * 100;
+  $progressBar.style.width = `${progress}%`;
+}
+
+function setNav() {
+  const step = STEPS[state.stepIndex];
+  const footerNav = document.querySelector(".footer__nav");
+  document.querySelector(".footer").style.display = step.hideNav ? "none" : "";
+  if (step.hideNav) return;
+  $btnBack.style.visibility = state.stepIndex === 0 || step.terminal ? "hidden" : "visible";
+  $btnNextLabel.textContent = step.next || "Continue";
+  $btnNext.disabled = false;
+  if (footerNav) {
+    footerNav.style.gridTemplateColumns = "auto 1fr auto";
+  }
+}
+
+// ---------- Step rendering ----------
+function renderStep() {
+  renderStepper();
+  setNav();
+  const step = STEPS[state.stepIndex];
+  const tpl = document.getElementById(step.tpl);
+  const node = tpl.content.cloneNode(true);
+  $wizard.innerHTML = "";
+  $wizard.appendChild(node);
+
+  // Run per-step setup
+  switch (step.id) {
+    case "welcome":    setupWelcome(); break;
+    case "url":        setupUrl(); break;
+    case "analyzing":  runAnalyzing(); break;
+    case "brand":      setupBrand(); break;
+    case "typography": setupTypography(); break;
+    case "tokens":     setupTokens(); break;
+    case "generating": runGenerating(); break;
+    case "preview":    setupPreview(); break;
+  }
+  // focus mgmt
+  const focusable = $wizard.querySelector("input, button[autofocus], [autofocus]");
+  if (focusable) focusable.focus({ preventScroll: true });
+}
+
+// ---------- Welcome ----------
+function setupWelcome() {
+  $wizard.querySelector("[data-action='start']").addEventListener("click", () => goNext());
+}
+
+// ---------- URL step ----------
+function setupUrl() {
+  const $input = $wizard.querySelector("#input-url");
+  const $err = $wizard.querySelector("#url-error");
+  $input.value = state.publisher.url.replace(/^https?:\/\//, "");
+  $input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); goNext(); }
+  });
+  $input.addEventListener("input", () => { $err.textContent = ""; });
+  $wizard.querySelectorAll(".chip").forEach((b) => {
+    b.addEventListener("click", () => {
+      $input.value = b.dataset.example;
+      $input.focus();
+    });
+  });
+}
+
+function validateUrl() {
+  const $input = document.getElementById("input-url");
+  const $err = document.getElementById("url-error");
+  const raw = ($input.value || "").trim().replace(/^https?:\/\//, "").replace(/\/+$/, "");
+  if (!raw) { $err.textContent = "Enter a publisher URL to continue."; $input.focus(); return false; }
+  if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+/i.test(raw)) {
+    $err.textContent = "That doesn't look like a domain. Try www.theverge.com.";
+    $input.focus();
+    return false;
+  }
+  state.publisher.url = `https://${raw}`;
+  state.publisher.domain = raw.replace(/^www\./, "");
+  state.publisher.name = state.publisher.domain
+    .split(".")[0]
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return true;
+}
+
+// ---------- Analyzing step ----------
+async function runAnalyzing() {
+  const setStatus = (text) => { const el = document.getElementById("loader-status"); if (el) el.textContent = text; };
+  const advance = (id, status) => {
+    document.querySelectorAll(".checks li").forEach((li) => {
+      if (li.classList.contains("is-active")) {
+        li.classList.remove("is-active");
+        li.classList.add("is-done");
+      }
+    });
+    if (id) document.getElementById(id)?.classList.add("is-active");
+    if (status) setStatus(status);
+  };
+
+  advance("check-fetch", "Fetching favicon");
+  // fetch favicon, sample colors
+  const faviconUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(state.publisher.domain)}&sz=128`;
+  const palette = await fetchAndSamplePalette(faviconUrl);
+  await delay(700);
+
+  advance("check-extract", "Extracting dominant colors");
+  if (palette) {
+    state.brand.logoUrl = faviconUrl;
+    state.brand.colors.primary = palette[0];
+    state.brand.colors.accent = palette[1] || rotateHue(palette[0], 30);
+  } else {
+    state.brand.logoUrl = "";
+    state.brand.colors.primary = pickFallbackColor(state.publisher.domain);
+    state.brand.colors.accent = rotateHue(state.brand.colors.primary, 40);
+  }
+  state.brand.monogram = state.publisher.name.charAt(0).toUpperCase();
+  await delay(700);
+
+  advance("check-tokens", "Building initial brand tokens");
+  await delay(900);
+
+  // mark all done
+  document.querySelectorAll(".checks li").forEach((li) => {
+    li.classList.remove("is-active");
+    li.classList.add("is-done");
+  });
+  setStatus("All set");
+  await delay(450);
+
+  goNext();
+}
+
+// ---------- Brand step ----------
+function setupBrand() {
+  const $favicon = document.getElementById("brand-favicon");
+  const $monogram = document.getElementById("brand-monogram");
+  const $name = document.getElementById("input-name");
+  const $palette = document.getElementById("palette");
+
+  $name.value = state.publisher.name;
+  $name.addEventListener("input", () => {
+    state.publisher.name = $name.value || state.publisher.name;
+    state.brand.monogram = (state.publisher.name.charAt(0) || "B").toUpperCase();
+    $monogram.textContent = state.brand.monogram;
+  });
+  $monogram.textContent = state.brand.monogram || "B";
+
+  if (state.brand.logoUrl) {
+    $favicon.src = state.brand.logoUrl;
+    $favicon.onload = () => $favicon.classList.add("is-loaded");
+    $favicon.onerror = () => $favicon.classList.remove("is-loaded");
+  }
+
+  const swatchDefs = [
+    { key: "primary", name: "Primary",  role: "Buttons, links, brand accents" },
+    { key: "accent",  name: "Accent",   role: "Highlights, tags, hover states" },
+    { key: "ink",     name: "Ink",      role: "Body text & headlines" },
+    { key: "surface", name: "Surface",  role: "Page & card backgrounds" }
+  ];
+  $palette.innerHTML = "";
+  swatchDefs.forEach((def) => {
+    const wrap = document.createElement("label");
+    wrap.className = "swatch";
+    wrap.innerHTML = `
+      <span class="swatch__chip" style="background:${state.brand.colors[def.key]}">
+        <input type="color" value="${state.brand.colors[def.key]}" aria-label="${def.name}">
+      </span>
+      <span class="swatch__meta">
+        <span class="swatch__name">${def.name}</span>
+        <span class="swatch__role">${def.role}</span>
+      </span>
+      <span class="swatch__hex">${state.brand.colors[def.key]}</span>
+    `;
+    const $input = wrap.querySelector("input");
+    const $chip = wrap.querySelector(".swatch__chip");
+    const $hex = wrap.querySelector(".swatch__hex");
+    $input.addEventListener("input", () => {
+      state.brand.colors[def.key] = $input.value;
+      $chip.style.background = $input.value;
+      $hex.textContent = $input.value;
+      renderBrandPreview();
+    });
+    $palette.appendChild(wrap);
+  });
+
+  renderBrandPreview();
+}
+
+function renderBrandPreview() {
+  const $body = document.getElementById("brand-preview");
+  if (!$body) return;
+  const c = state.brand.colors;
+  const heading = state.brand.typography.heading;
+  $body.style.setProperty("--p-bg", c.surface);
+  $body.style.setProperty("--p-fg", c.ink);
+  $body.style.setProperty("--p-primary", c.primary);
+  $body.style.setProperty("--p-accent", c.accent);
+  $body.style.setProperty("--p-heading", heading);
+
+  $body.style.background = c.surface;
+  $body.style.color = c.ink;
+
+  $body.innerHTML = `
+    <span class="pv-tag" style="background:${c.primary}">Politics</span>
+    <h3 class="pv-title" style="font-family:'${heading}',serif;color:${c.ink}">A new feed experience that keeps readers coming back.</h3>
+    <div class="pv-byline" style="color:${mix(c.ink, c.surface, 0.5)}">By ${state.publisher.name} Staff · 4 min read</div>
+    <div class="pv-card" style="background:${mix(c.surface, c.ink, 0.06)};border-color:${mix(c.surface, c.ink, 0.12)}">
+      <div class="pv-card__thumb" style="background:linear-gradient(135deg, ${c.primary}, ${c.accent})"></div>
+      <div>
+        <div class="pv-card__title" style="color:${c.ink}">Inside the redesigned reading experience</div>
+        <div class="pv-card__meta" style="color:${mix(c.ink, c.surface, 0.45)}">${state.publisher.name} · Today</div>
+      </div>
+    </div>
+  `;
+}
+
+// ---------- Typography step ----------
+function setupTypography() {
+  const $grid = document.getElementById("type-grid");
+  $grid.innerHTML = "";
+  TYPE_PAIRS.forEach((p) => {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "type-card";
+    if (p.id === state.brand.typography.pairId) card.classList.add("is-selected");
+    card.innerHTML = `
+      <div class="type-card__name"><span>${p.name}</span><span>${p.heading} · ${p.body}</span></div>
+      <div class="type-card__heading" style="font-family:'${p.heading}',${p.headingFb}">${state.publisher.name || "The Daily Edition"}</div>
+      <div class="type-card__body" style="font-family:'${p.body}',${p.bodyFb}">A polished feed that respects every reader. From breaking news to deep dives — beautifully set, instantly recognisable.</div>
+    `;
+    card.addEventListener("click", () => {
+      state.brand.typography = {
+        pairId: p.id,
+        heading: p.heading,
+        headingFallback: p.headingFb,
+        body: p.body,
+        bodyFallback: p.bodyFb
+      };
+      $grid.querySelectorAll(".type-card").forEach((c) => c.classList.remove("is-selected"));
+      card.classList.add("is-selected");
+    });
+    $grid.appendChild(card);
+  });
+}
+
+// ---------- Tokens step ----------
+function setupTokens() {
+  $wizard.querySelectorAll(".seg").forEach((seg) => {
+    const token = seg.dataset.token;
+    seg.querySelectorAll("button").forEach((btn) => {
+      const isCurrent = state.brand.tokens[token] === btn.dataset.value;
+      btn.setAttribute("aria-pressed", isCurrent ? "true" : "false");
+      btn.addEventListener("click", () => {
+        state.brand.tokens[token] = btn.dataset.value;
+        seg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", b === btn ? "true" : "false"));
+      });
+    });
+  });
+}
+
+// ---------- Generating step ----------
+async function runGenerating() {
+  const setStatus = (text) => { const el = document.getElementById("gen-status"); if (el) el.textContent = text; };
+  const advance = (id, status) => {
+    document.querySelectorAll(".checks li").forEach((li) => {
+      if (li.classList.contains("is-active")) { li.classList.remove("is-active"); li.classList.add("is-done"); }
+    });
+    if (id) document.getElementById(id)?.classList.add("is-active");
+    if (status) setStatus(status);
+  };
+
+  advance("check-css", "Compiling CSS variables");
+  await delay(900);
+  state.generated.css = generateBrandCss(state.brand, state.publisher);
+
+  advance("check-components", "Styling components");
+  await delay(900);
+
+  advance("check-prototype", "Rendering article prototype");
+  state.generated.html = renderArticleHtml(state.brand, state.publisher, state.generated.css);
+  await delay(900);
+
+  document.querySelectorAll(".checks li").forEach((li) => { li.classList.remove("is-active"); li.classList.add("is-done"); });
+  setStatus("Ready");
+  await delay(400);
+  goNext();
+}
+
+// ---------- Preview step ----------
+function setupPreview() {
+  const $frame = document.getElementById("prototype-frame");
+  $frame.srcdoc = state.generated.html;
+
+  const $cssOut = document.getElementById("css-output");
+  $cssOut.textContent = state.generated.css;
+
+  // device toggle
+  const $device = document.getElementById("device-frame");
+  document.getElementById("device-toggle").querySelectorAll("button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("#device-toggle button").forEach((b) => b.setAttribute("aria-pressed", "false"));
+      btn.setAttribute("aria-pressed", "true");
+      $device.classList.remove("device--tablet", "device--mobile");
+      if (btn.dataset.device === "tablet") $device.classList.add("device--tablet");
+      if (btn.dataset.device === "mobile") $device.classList.add("device--mobile");
+    });
+  });
+
+  document.getElementById("btn-download-css").addEventListener("click", () => {
+    download(`${slug(state.publisher.domain)}.brand-kit.css`, state.generated.css, "text/css");
+    showToast("CSS downloaded");
+  });
+  document.getElementById("btn-download-html").addEventListener("click", () => {
+    download(`${slug(state.publisher.domain)}.article-prototype.html`, state.generated.html, "text/html");
+    showToast("HTML downloaded");
+  });
+}
+
+// ---------- Navigation ----------
+function goNext() {
+  const step = STEPS[state.stepIndex];
+
+  // Per-step validation
+  if (step.id === "url") {
+    if (!validateUrl()) return;
+  }
+  if (step.terminal) {
+    // restart
+    state.stepIndex = 0;
+    renderStep();
+    return;
+  }
+  state.stepIndex = Math.min(state.stepIndex + 1, STEPS.length - 1);
+  renderStep();
+}
+
+function goBack() {
+  if (state.stepIndex === 0) return;
+  // skip auto-loader steps when going back
+  let target = state.stepIndex - 1;
+  while (target > 0 && STEPS[target].hideNav) target -= 1;
+  state.stepIndex = target;
+  renderStep();
+}
+
+$btnNext.addEventListener("click", goNext);
+$btnBack.addEventListener("click", goBack);
+
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  // Let buttons & links handle their own Enter; only advance from text inputs.
+  const tag = document.activeElement?.tagName;
+  if (tag !== "INPUT") return;
+  const step = STEPS[state.stepIndex];
+  if (step.hideNav) return;
+  e.preventDefault();
+  goNext();
+});
+
+// ---------- Helpers ----------
+function delay(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+function download(filename, content, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+let toastTimer;
+function showToast(msg) {
+  $toast.textContent = msg;
+  $toast.classList.add("is-visible");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $toast.classList.remove("is-visible"), 1800);
+}
+
+function slug(s) {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+// ---------- Color utilities ----------
+function fetchAndSamplePalette(url) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.referrerPolicy = "no-referrer";
+    img.onload = () => {
+      try {
+        const c = document.createElement("canvas");
+        const size = 64;
+        c.width = size; c.height = size;
+        const ctx = c.getContext("2d");
+        ctx.drawImage(img, 0, 0, size, size);
+        const data = ctx.getImageData(0, 0, size, size).data;
+        resolve(quantize(data));
+      } catch {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+
+// Simple frequency-based color quantization, biased toward saturated/colorful pixels
+function quantize(data) {
+  const buckets = new Map();
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+    if (a < 200) continue;
+    // skip near-white & near-black to avoid favicon bg/text
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    if (lum > 240 || lum < 18) continue;
+    const sat = max === 0 ? 0 : (max - min) / max;
+    const weight = 1 + sat * 4; // bias to saturated
+    // bin to 4-bit per channel
+    const key = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
+    buckets.set(key, (buckets.get(key) || 0) + weight);
+  }
+  if (!buckets.size) return null;
+  const sorted = [...buckets.entries()].sort((a, b) => b[1] - a[1]);
+  const palette = [];
+  for (const [key] of sorted) {
+    const r = ((key >> 8) & 0xf) * 17;
+    const g = ((key >> 4) & 0xf) * 17;
+    const b = (key & 0xf) * 17;
+    const hex = rgbToHex(r, g, b);
+    if (palette.every((p) => colorDistance(p, hex) > 60)) palette.push(hex);
+    if (palette.length >= 4) break;
+  }
+  return palette.length ? palette : null;
+}
+
+function colorDistance(a, b) {
+  const A = hexToRgb(a), B = hexToRgb(b);
+  return Math.sqrt((A.r - B.r) ** 2 + (A.g - B.g) ** 2 + (A.b - B.b) ** 2);
+}
+
+function rgbToHex(r, g, b) {
+  return "#" + [r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("");
+}
+
+function hexToRgb(hex) {
+  const h = hex.replace("#", "");
+  const v = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  return { r: parseInt(v.slice(0, 2), 16), g: parseInt(v.slice(2, 4), 16), b: parseInt(v.slice(4, 6), 16) };
+}
+
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0;
+  const l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)); break;
+      case g: h = ((b - r) / d + 2); break;
+      case b: h = ((r - g) / d + 4); break;
+    }
+    h /= 6;
+  }
+  return { h: h * 360, s: s * 100, l: l * 100 };
+}
+
+function hslToRgb(h, s, l) {
+  h /= 360; s /= 100; l /= 100;
+  if (s === 0) { const v = Math.round(l * 255); return { r: v, g: v, b: v }; }
+  const hue2rgb = (p, q, t) => {
+    if (t < 0) t += 1; if (t > 1) t -= 1;
+    if (t < 1/6) return p + (q - p) * 6 * t;
+    if (t < 1/2) return q;
+    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+    return p;
+  };
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  return {
+    r: Math.round(hue2rgb(p, q, h + 1/3) * 255),
+    g: Math.round(hue2rgb(p, q, h) * 255),
+    b: Math.round(hue2rgb(p, q, h - 1/3) * 255)
+  };
+}
+
+function rotateHue(hex, deg) {
+  const { r, g, b } = hexToRgb(hex);
+  const { h, s, l } = rgbToHsl(r, g, b);
+  const next = hslToRgb((h + deg + 360) % 360, Math.max(s, 55), Math.min(Math.max(l, 30), 60));
+  return rgbToHex(next.r, next.g, next.b);
+}
+
+function mix(a, b, t) {
+  const A = hexToRgb(a), B = hexToRgb(b);
+  return rgbToHex(
+    Math.round(A.r + (B.r - A.r) * t),
+    Math.round(A.g + (B.g - A.g) * t),
+    Math.round(A.b + (B.b - A.b) * t)
+  );
+}
+
+function isDark(hex) {
+  const { r, g, b } = hexToRgb(hex);
+  return (0.299 * r + 0.587 * g + 0.114 * b) < 128;
+}
+
+function pickFallbackColor(seed) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  const hue = h % 360;
+  const { r, g, b } = hslToRgb(hue, 70, 52);
+  return rgbToHex(r, g, b);
+}
+
+// ---------- Boot ----------
+renderStep();
+
+</script>
+  </body>
+</html>

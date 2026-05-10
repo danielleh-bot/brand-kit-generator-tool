@@ -6,15 +6,25 @@ feed experience.
 
 ## Run it
 
-It's a static, no-build site. Serve the folder with any static server:
+Two ways:
+
+### 1. Single-file (no server needed)
+
+`studio.html` is a self-contained build with all CSS + JS inlined. Open it
+directly in any browser (`file://` works) or in any HTML preview pane.
+
+```bash
+python3 build.py    # rebuild studio.html from sources after edits
+```
+
+### 2. Modular dev server
+
+The source files use native ES modules, so they must be served over HTTP:
 
 ```bash
 python3 -m http.server 8765
 # then open http://localhost:8765
 ```
-
-The app uses native ES modules, so it must be served over HTTP (not opened
-via `file://`).
 
 ## What the wizard does
 
