@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Brand Kit Studio — generate a publisher CSS kit & live article preview</title>
+    <meta
+      name="description"
+      content="Turn any publisher URL into a polished brand kit, a portable CSS file, and a fully styled article prototype with the new feed experience."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;800&family=Fraunces:wght@600;700;800&family=Source+Serif+4:wght@500;600;700&family=Merriweather:wght@700;800&family=DM+Serif+Display&family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@500;600;700&family=Work+Sans:wght@500;600;700&family=IBM+Plex+Sans:wght@500;600;700&family=Lora:wght@500;600;700&family=JetBrains+Mono:wght@500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="aurora" aria-hidden="true">
+      <span class="aurora__blob aurora__blob--a"></span>
+      <span class="aurora__blob aurora__blob--b"></span>
+      <span class="aurora__blob aurora__blob--c"></span>
+    </div>
+
+    <header class="topbar" role="banner">
+      <div class="brand">
+        <span class="brand__mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" width="28" height="28">
+            <defs>
+              <linearGradient id="bk-mark" x1="0" x2="1" y1="0" y2="1">
+                <stop offset="0" stop-color="#7c5cff" />
+                <stop offset="1" stop-color="#22d3ee" />
+              </linearGradient>
+            </defs>
+            <rect x="2" y="2" width="28" height="28" rx="9" fill="url(#bk-mark)" />
+            <path
+              d="M11 22V10h5.2c2.4 0 3.9 1.2 3.9 3.1 0 1.3-.7 2.2-1.9 2.6 1.5.3 2.4 1.4 2.4 2.9 0 2-1.6 3.4-4.1 3.4H11Zm2.5-7.2h2.3c1.1 0 1.8-.5 1.8-1.4 0-.9-.7-1.4-1.8-1.4h-2.3v2.8Zm0 5.1h2.5c1.2 0 2-.6 2-1.6s-.7-1.6-2-1.6h-2.5v3.2Z"
+              fill="#0b0c14"
+            />
+          </svg>
+        </span>
+        <div class="brand__text">
+          <span class="brand__title">Brand Kit Studio</span>
+          <span class="brand__sub">Publisher edition</span>
+        </div>
+      </div>
+      <nav class="stepper" aria-label="Progress">
+        <ol id="stepper" class="stepper__list"></ol>
+      </nav>
+      <div class="topbar__meta">
+        <span id="step-counter" class="step-counter" aria-live="polite">Step 1 of 7</span>
+      </div>
+    </header>
+
+    <main id="wizard" class="wizard" role="main" aria-live="polite"></main>
+
+    <footer class="footer" role="contentinfo">
+      <div class="footer__nav">
+        <button id="btn-back" class="btn btn--ghost" type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+          Back
+        </button>
+        <div class="footer__progress">
+          <span class="progress" aria-hidden="true"><span id="progress-bar" class="progress__bar"></span></span>
+        </div>
+        <button id="btn-next" class="btn btn--primary" type="button">
+          <span id="btn-next-label">Continue</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+      </div>
+    </footer>
+
+    <!-- Step templates -->
+    <template id="tpl-welcome">
+      <section class="step step--welcome" data-step="welcome">
+        <div class="hero">
+          <div class="hero__eyebrow">
+            <span class="dot"></span> A wizard for publisher brand kits
+          </div>
+          <h1 class="hero__title">
+            Turn any publisher into a
+            <span class="grad">living brand kit</span>
+            in under a minute.
+          </h1>
+          <p class="hero__lede">
+            Drop in a URL. We'll extract the brand, build a polished CSS file, and render a real
+            article page with the new feed experience — fully themed, fully yours.
+          </p>
+          <ul class="hero__bullets">
+            <li><span class="check"></span> Auto-detect colors from the publisher's favicon</li>
+            <li><span class="check"></span> Fine-tune palette, typography & style tokens</li>
+            <li><span class="check"></span> Export a portable <code>brand-kit.css</code></li>
+            <li><span class="check"></span> Preview a live article + new feed prototype</li>
+          </ul>
+          <div class="hero__cta">
+            <button class="btn btn--primary btn--lg" data-action="start">
+              Start the wizard
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+            </button>
+            <span class="hero__time">~ 60 seconds</span>
+          </div>
+        </div>
+        <div class="hero__visual" aria-hidden="true">
+          <div class="card-stack">
+            <div class="card-mini card-mini--1">
+              <span class="bar bar--w70"></span>
+              <span class="bar bar--w50"></span>
+              <span class="bar bar--w90"></span>
+            </div>
+            <div class="card-mini card-mini--2">
+              <span class="bar bar--w90"></span>
+              <span class="bar bar--w60"></span>
+              <span class="bar bar--w40"></span>
+            </div>
+            <div class="card-mini card-mini--3">
+              <div class="palette-mini">
+                <span></span><span></span><span></span><span></span><span></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </template>
+
+    <template id="tpl-url">
+      <section class="step" data-step="url">
+        <header class="step__head">
+          <span class="step__kicker">Step 1 — Source</span>
+          <h2 class="step__title">Which publisher are we kitting out?</h2>
+          <p class="step__sub">
+            Paste any publisher URL. We'll fetch the favicon, sample its colors, and use the
+            domain as the working brand name. You can adjust everything in the next step.
+          </p>
+        </header>
+        <div class="form">
+          <label class="field">
+            <span class="field__label">Publisher URL</span>
+            <div class="field__input field__input--with-prefix">
+              <span class="field__prefix">https://</span>
+              <input
+                id="input-url"
+                type="text"
+                placeholder="www.theverge.com"
+                autocomplete="off"
+                spellcheck="false"
+                autofocus
+              />
+            </div>
+            <span id="url-error" class="field__error"></span>
+          </label>
+          <div class="examples">
+            <span class="examples__label">Try one:</span>
+            <button class="chip" data-example="www.theverge.com">The Verge</button>
+            <button class="chip" data-example="www.nytimes.com">NYT</button>
+            <button class="chip" data-example="www.bbc.com">BBC</button>
+            <button class="chip" data-example="techcrunch.com">TechCrunch</button>
+            <button class="chip" data-example="www.economist.com">The Economist</button>
+          </div>
+        </div>
+      </section>
+    </template>
+
+    <template id="tpl-analyzing">
+      <section class="step step--center" data-step="analyzing">
+        <div class="loader">
+          <div class="loader__art loader__art--scan">
+            <svg viewBox="0 0 200 200" width="200" height="200" aria-hidden="true">
+              <defs>
+                <linearGradient id="scan-grad" x1="0" x2="1" y1="0" y2="1">
+                  <stop offset="0" stop-color="var(--accent-1)" />
+                  <stop offset="1" stop-color="var(--accent-2)" />
+                </linearGradient>
+                <radialGradient id="scan-globe" cx="50%" cy="50%" r="50%">
+                  <stop offset="0" stop-color="rgba(255,255,255,.18)" />
+                  <stop offset="1" stop-color="rgba(255,255,255,0)" />
+                </radialGradient>
+              </defs>
+              <circle cx="100" cy="100" r="62" fill="url(#scan-globe)" stroke="rgba(255,255,255,.18)" stroke-width="1.2"/>
+              <ellipse cx="100" cy="100" rx="62" ry="22" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="1.2"/>
+              <ellipse cx="100" cy="100" rx="22" ry="62" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="1.2"/>
+              <g class="scan__lens">
+                <circle cx="0" cy="0" r="22" fill="none" stroke="url(#scan-grad)" stroke-width="3"/>
+                <line x1="16" y1="16" x2="32" y2="32" stroke="url(#scan-grad)" stroke-width="3" stroke-linecap="round"/>
+                <circle cx="0" cy="0" r="22" fill="rgba(124,92,255,.08)"/>
+              </g>
+              <g class="scan__sparks">
+                <circle cx="60" cy="50" r="2" fill="var(--accent-1)"/>
+                <circle cx="150" cy="80" r="2" fill="var(--accent-2)"/>
+                <circle cx="130" cy="150" r="2" fill="#fff"/>
+                <circle cx="55" cy="140" r="2" fill="var(--accent-1)"/>
+              </g>
+            </svg>
+          </div>
+          <h3 class="loader__title">Analyzing the publisher…</h3>
+          <p id="loader-status" class="loader__status">Fetching favicon</p>
+          <ul class="checks">
+            <li id="check-fetch"><span class="checks__dot"></span> Fetch site icon</li>
+            <li id="check-extract"><span class="checks__dot"></span> Sample dominant colors</li>
+            <li id="check-tokens"><span class="checks__dot"></span> Build initial brand tokens</li>
+          </ul>
+        </div>
+      </section>
+    </template>
+
+    <template id="tpl-brand">
+      <section class="step" data-step="brand">
+        <header class="step__head">
+          <span class="step__kicker">Step 2 — Brand identity</span>
+          <h2 class="step__title">Here's what we found. Tweak away.</h2>
+          <p class="step__sub">
+            Adjust the palette to match the publisher's voice. Each swatch updates the live
+            preview on the right.
+          </p>
+        </header>
+        <div class="grid grid--2">
+          <div class="form">
+            <div class="identity">
+              <div class="identity__avatar">
+                <img id="brand-favicon" alt="" />
+                <span id="brand-monogram" class="identity__monogram"></span>
+              </div>
+              <label class="field field--inline">
+                <span class="field__label">Publisher name</span>
+                <div class="field__input">
+                  <input id="input-name" type="text" autocomplete="off" />
+                </div>
+              </label>
+            </div>
+            <div class="palette" id="palette"></div>
+          </div>
+          <aside class="preview-card" aria-label="Live preview">
+            <div class="preview-card__chrome">
+              <span></span><span></span><span></span>
+            </div>
+            <div class="preview-card__body" id="brand-preview"></div>
+          </aside>
+        </div>
+      </section>
+    </template>
+
+    <template id="tpl-typography">
+      <section class="step" data-step="typography">
+        <header class="step__head">
+          <span class="step__kicker">Step 3 — Typography</span>
+          <h2 class="step__title">Pick a voice for headlines &amp; body.</h2>
+          <p class="step__sub">
+            Pair a display face with a readable body face. Hover any combo to preview it
+            instantly.
+          </p>
+        </header>
+        <div class="type-grid" id="type-grid"></div>
+      </section>
+    </template>
+
+    <template id="tpl-tokens">
+      <section class="step" data-step="tokens">
+        <header class="step__head">
+          <span class="step__kicker">Step 4 — Style tokens</span>
+          <h2 class="step__title">Set the rhythm.</h2>
+          <p class="step__sub">
+            Roundness and density define how the brand feels. Pick what fits the publisher's
+            personality.
+          </p>
+        </header>
+        <div class="form">
+          <div class="token-group">
+            <span class="token-group__label">Corner radius</span>
+            <div class="seg" data-token="radius">
+              <button data-value="sharp"><span class="swatch-radius swatch-radius--sharp"></span><span>Sharp</span></button>
+              <button data-value="soft"><span class="swatch-radius swatch-radius--soft"></span><span>Soft</span></button>
+              <button data-value="rounded"><span class="swatch-radius swatch-radius--rounded"></span><span>Rounded</span></button>
+              <button data-value="pill"><span class="swatch-radius swatch-radius--pill"></span><span>Pill</span></button>
+            </div>
+          </div>
+          <div class="token-group">
+            <span class="token-group__label">Density</span>
+            <div class="seg" data-token="density">
+              <button data-value="compact"><span>Compact</span></button>
+              <button data-value="comfortable"><span>Comfortable</span></button>
+              <button data-value="spacious"><span>Spacious</span></button>
+            </div>
+          </div>
+          <div class="token-group">
+            <span class="token-group__label">Mood</span>
+            <div class="seg" data-token="mood">
+              <button data-value="light"><span>Light</span></button>
+              <button data-value="dark"><span>Dark</span></button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </template>
+
+    <template id="tpl-generating">
+      <section class="step step--center" data-step="generating">
+        <div class="loader">
+          <div class="loader__art loader__art--mix">
+            <svg viewBox="0 0 220 220" width="220" height="220" aria-hidden="true">
+              <defs>
+                <linearGradient id="beaker-grad" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0" stop-color="var(--accent-1)"/>
+                  <stop offset="1" stop-color="var(--accent-2)"/>
+                </linearGradient>
+              </defs>
+              <g class="mix__drops">
+                <circle class="drop drop--1" cx="80" cy="20" r="6"/>
+                <circle class="drop drop--2" cx="110" cy="20" r="6"/>
+                <circle class="drop drop--3" cx="140" cy="20" r="6"/>
+              </g>
+              <path d="M70 90 L70 70 L150 70 L150 90 L180 170 Q180 195 155 195 L65 195 Q40 195 40 170 Z"
+                    fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.35)" stroke-width="2.5" stroke-linejoin="round"/>
+              <clipPath id="beaker-clip">
+                <path d="M70 90 L70 72 L150 72 L150 90 L178 168 Q178 192 155 192 L65 192 Q42 192 42 168 Z"/>
+              </clipPath>
+              <g clip-path="url(#beaker-clip)">
+                <rect class="mix__liquid" x="0" y="120" width="220" height="120" fill="url(#beaker-grad)"/>
+                <path class="mix__wave" d="M0 130 Q 30 120 60 130 T 120 130 T 180 130 T 240 130 V 220 H 0 Z" fill="url(#beaker-grad)" opacity=".7"/>
+              </g>
+            </svg>
+          </div>
+          <h3 class="loader__title">Mixing your brand kit…</h3>
+          <p id="gen-status" class="loader__status">Compiling tokens</p>
+          <ul class="checks">
+            <li id="check-css"><span class="checks__dot"></span> Compile CSS variables</li>
+            <li id="check-components"><span class="checks__dot"></span> Style components</li>
+            <li id="check-prototype"><span class="checks__dot"></span> Render article prototype</li>
+          </ul>
+        </div>
+      </section>
+    </template>
+
+    <template id="tpl-preview">
+      <section class="step step--full" data-step="preview">
+        <header class="step__head step__head--row">
+          <div>
+            <span class="step__kicker">Step 5 — Preview &amp; export</span>
+            <h2 class="step__title">Your brand kit is ready.</h2>
+            <p class="step__sub">
+              The article below is a live HTML prototype with the new feed experience, styled by
+              your generated CSS. Toggle device sizes and download the kit when you're happy.
+            </p>
+          </div>
+          <div class="preview-actions">
+            <div class="seg seg--sm" id="device-toggle">
+              <button data-device="desktop" aria-pressed="true">Desktop</button>
+              <button data-device="tablet">Tablet</button>
+              <button data-device="mobile">Mobile</button>
+            </div>
+            <button id="btn-download-css" class="btn btn--primary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              Download CSS
+            </button>
+            <button id="btn-download-html" class="btn btn--ghost">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              Download HTML
+            </button>
+          </div>
+        </header>
+        <div class="device" id="device-frame">
+          <iframe id="prototype-frame" title="Article prototype" sandbox="allow-same-origin allow-scripts"></iframe>
+        </div>
+        <details class="code-drawer">
+          <summary>Peek at the generated CSS</summary>
+          <pre><code id="css-output"></code></pre>
+        </details>
+      </section>
+    </template>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>
